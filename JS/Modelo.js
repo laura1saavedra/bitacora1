@@ -1,0 +1,788 @@
+// ============================================================
+// MODELO.JS
+// Datos, configuracion y acceso REST a SharePoint.
+// ============================================================
+(function (global) {
+  "use strict";
+
+  const CONFIG = Object.freeze({
+    lista: "Backlog",
+    sitioAlterno:
+      "https://globalhitss.sharepoint.com/sites/AppsColombiaDesarrollo/RetirosDeCesantiasDesarrollo",
+    tamanoPagina: 100,
+    reintentos: 3
+  });
+
+  const CAMPOS = Object.freeze({
+    id: {
+      interno: "Title",
+      tipo: "texto",
+      titulos: ["ID REQ", "ID Requerimiento", "Title", "Titulo"]
+    },
+    app: { interno: "APP", tipo: "texto", titulos: ["APP", "Aplicacion"] },
+    tipoServicio: {
+      interno: "Tipo_x0020_de_x0020_servicio",
+      tipo: "texto",
+      titulos: ["Tipo de servicio", "Tipo de Servicio", "TipoServicio"]
+    },
+    asunto: { interno: "Asunto", tipo: "texto", titulos: ["Asunto"] },
+    descripcion: {
+      interno: "Descripci_x00f3_n_x0020_de_x0020_la_x0020_solicitud_x0020_",
+      tipo: "texto",
+      titulos: ["Descripcion de la solicitud", "Descripcion", "Detalle"]
+    },
+    solicitadoPor: {
+      interno: "Solicitado_x0020_por",
+      tipo: "texto",
+      titulos: ["Solicitado por", "Solicitante"]
+    },
+    responsable: {
+      interno: "Responsable",
+      tipo: "persona",
+      titulos: ["Responsable"]
+    },
+    prioridad: {
+      interno: "Prioridad",
+      tipo: "texto",
+      titulos: ["Prioridad"]
+    },
+    estado: { interno: "Estado", tipo: "texto", titulos: ["Estado"] },
+    comentarios: {
+      interno: "Comentarios",
+      tipo: "texto",
+      titulos: ["Comentarios", "Observaciones"]
+    },
+    casoOrigen: {
+      interno: "Caso_x0020_Origen",
+      tipo: "texto",
+      titulos: ["Caso Origen", "Caso de origen"]
+    },
+    mentor: { interno: "Mentor", tipo: "persona", titulos: ["Mentor"] },
+    fechaEntrega: {
+      interno: "Fecha_x0020_Entrega",
+      tipo: "texto",
+      titulos: ["F.E Entrega", "Fecha Entrega", "Fecha de entrega"]
+    },
+    complejidad: {
+      interno: "Complejidad_x0020_",
+      tipo: "texto",
+      titulos: ["Complejidad"]
+    },
+    fechaSolicitud: {
+      interno: "Fecha_x0020_Solicitud",
+      tipo: "texto",
+      titulos: ["Fecha Solicitud", "Fecha de solicitud"]
+    },
+    fechaPAP: {
+      interno: "Fecha_x0020_PAP",
+      tipo: "texto",
+      titulos: ["F.E PAP", "Fecha PAP", "Fecha de PAP"]
+    },
+    fechaCierre: {
+      interno: "Fecha_x0020_Cierre",
+      tipo: "texto",
+      titulos: ["F.E Cierre", "Fecha Cierre", "Fecha de cierre"]
+    }
+  });
+
+  const ODATA = {
+    Accept: "application/json;odata=verbose"
+  };
+
+  let tipoEntidadLista = null;
+  let esquemaLista = null;
+  let ultimoDiagnosticoEscritura = null;
+
+  function urlSitio() {
+    const contexto = global._spPageContextInfo;
+    return contexto && contexto.webAbsoluteUrl
+      ? contexto.webAbsoluteUrl
+      : CONFIG.sitioAlterno;
+  }
+
+  function estaEnSharePoint() {
+    return Boolean(
+      global._spPageContextInfo &&
+      global._spPageContextInfo.webAbsoluteUrl
+    );
+  }
+
+  function usuarioActual() {
+    const contexto = global._spPageContextInfo || {};
+    return {
+      nombre:
+        contexto.userDisplayName ||
+        contexto.userLoginName ||
+        contexto.userEmail ||
+        "Usuario Microsoft 365",
+      correo: contexto.userEmail || contexto.userLoginName || ""
+    };
+  }
+
+  function endpointLista() {
+    const tituloSeguro = CONFIG.lista.replace(/'/g, "''");
+    return (
+      urlSitio() +
+      "/_api/web/lists/getbytitle('" +
+      tituloSeguro +
+      "')"
+    );
+  }
+
+  function seleccionarCampos() {
+    const seleccion = ["Id"];
+    Object.keys(CAMPOS).forEach(function (clave) {
+      const campo = CAMPOS[clave];
+      seleccion.push(
+        campo.tipo === "persona"
+          ? campo.interno + "/Title"
+          : campo.interno
+      );
+    });
+    return seleccion.join(",");
+  }
+
+  function expandirCampos() {
+    return Object.keys(CAMPOS)
+      .map(function (clave) {
+        return CAMPOS[clave];
+      })
+      .filter(function (campo) {
+        return campo.tipo === "persona";
+      })
+      .map(function (campo) {
+        return campo.interno;
+      })
+      .filter(function (valor, indice, arreglo) {
+        return arreglo.indexOf(valor) === indice;
+      })
+      .join(",");
+  }
+
+  function parametrosLectura() {
+    const seleccion = [
+      "*",
+      "AttachmentFiles/FileName",
+      "AttachmentFiles/ServerRelativeUrl"
+    ];
+    const expansion = ["AttachmentFiles"];
+
+    Object.keys(CAMPOS).forEach(function (clave) {
+      const campo = resolverCampo(clave);
+      if (campo && campo.tipo.indexOf("User") === 0) {
+        seleccion.push(campo.nombreInterno + "/Title");
+        expansion.push(campo.nombreInterno);
+      }
+    });
+
+    return (
+      "$select=" +
+      seleccion.filter(function (valor, indice, arreglo) {
+        return arreglo.indexOf(valor) === indice;
+      }).join(",") +
+      "&$expand=" +
+      expansion.filter(function (valor, indice, arreglo) {
+        return arreglo.indexOf(valor) === indice;
+      }).join(",")
+    );
+  }
+
+  function desdeSharePoint(item) {
+    const archivos =
+      item.AttachmentFiles && Array.isArray(item.AttachmentFiles.results)
+        ? item.AttachmentFiles.results
+        : [];
+    const resultado = {
+      spItemId: item.Id,
+      archivosAdjuntos: archivos.map(function (archivo) {
+        return {
+          nombre: archivo.FileName || "",
+          url: archivo.ServerRelativeUrl || ""
+        };
+      })
+    };
+    Object.keys(CAMPOS).forEach(function (clave) {
+      const configuracion = CAMPOS[clave];
+      const campoReal = resolverCampo(clave);
+      const nombreInterno = campoReal
+        ? campoReal.nombreInterno
+        : configuracion.interno;
+      const valor = item[nombreInterno];
+      const esPersona =
+        campoReal
+          ? campoReal.tipo.indexOf("User") === 0
+          : configuracion.tipo === "persona";
+      if (esPersona) {
+        const idPersona = item[nombreInterno + "Id"];
+        resultado[clave] =
+          valor && valor.Title
+            ? valor.Title
+            : valor != null && typeof valor !== "object"
+              ? valor
+              : idPersona != null
+                ? "Usuario #" + idPersona
+                : "";
+      } else {
+        resultado[clave] = valor == null ? "" : valor;
+      }
+    });
+    return resultado;
+  }
+
+  function normalizarNombre(valor) {
+    return String(valor || "")
+      .toLowerCase()
+      .replace(/[\u00e1\u00e0\u00e4\u00e2]/g, "a")
+      .replace(/[\u00e9\u00e8\u00eb\u00ea]/g, "e")
+      .replace(/[\u00ed\u00ec\u00ef\u00ee]/g, "i")
+      .replace(/[\u00f3\u00f2\u00f6\u00f4]/g, "o")
+      .replace(/[\u00fa\u00f9\u00fc\u00fb]/g, "u")
+      .replace(/\u00f1/g, "n")
+      .replace(/[^a-z0-9]/g, "");
+  }
+
+  function resolverCampo(clave) {
+    const configuracion = CAMPOS[clave];
+    if (!configuracion || !esquemaLista) {
+      return null;
+    }
+
+    const coincidenciaInterna = esquemaLista.find(function (campo) {
+      return campo.nombreInterno === configuracion.interno;
+    });
+    if (coincidenciaInterna) {
+      return coincidenciaInterna;
+    }
+
+    const alternativas = [configuracion.interno]
+      .concat(configuracion.titulos || [])
+      .map(normalizarNombre);
+    return esquemaLista.find(function (campo) {
+      return (
+        alternativas.indexOf(normalizarNombre(campo.titulo)) !== -1 ||
+        alternativas.indexOf(normalizarNombre(campo.nombreInterno)) !== -1
+      );
+    }) || null;
+  }
+
+  function fechaIso(valor) {
+    if (valor == null || valor === "") {
+      return null;
+    }
+    const texto = String(valor).trim();
+    const fechaColombia = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(texto);
+    if (fechaColombia) {
+      return new Date(
+        Date.UTC(
+          Number(fechaColombia[3]),
+          Number(fechaColombia[2]) - 1,
+          Number(fechaColombia[1])
+        )
+      ).toISOString();
+    }
+    const fecha = new Date(texto);
+    return isNaN(fecha.getTime()) ? null : fecha.toISOString();
+  }
+
+  function convertirValor(valor, campo) {
+    const tipo = campo.tipo || "";
+    if (valor == null || valor === "") {
+      return null;
+    }
+    if (tipo === "DateTime") {
+      return fechaIso(valor);
+    }
+    if (tipo === "Number" || tipo === "Currency") {
+      const numero = Number(valor);
+      return isNaN(numero) ? null : numero;
+    }
+    if (tipo === "Integer" || tipo === "Counter") {
+      const entero = parseInt(valor, 10);
+      return isNaN(entero) ? null : entero;
+    }
+    if (tipo === "Boolean") {
+      return valor === true || valor === 1 || String(valor).toLowerCase() === "true";
+    }
+    if (tipo === "MultiChoice") {
+      return {
+        __metadata: { type: "Collection(Edm.String)" },
+        results: (Array.isArray(valor) ? valor : [valor]).map(String)
+      };
+    }
+    if (
+      tipo === "Text" ||
+      tipo === "Note" ||
+      tipo === "Choice" ||
+      tipo === "Guid"
+    ) {
+      return String(valor);
+    }
+    return typeof valor === "object" ? valor : String(valor);
+  }
+
+  function haciaSharePoint(item) {
+    const resultado = {};
+    const omitidos = [];
+    Object.keys(CAMPOS).forEach(function (clave) {
+      if (item[clave] === undefined) {
+        return;
+      }
+
+      const campo = resolverCampo(clave);
+      if (!campo || campo.soloLectura) {
+        omitidos.push(clave);
+        return;
+      }
+
+      if (campo.tipo.indexOf("User") === 0) {
+        const idUsuario =
+          clave === "solicitadoPor" &&
+          global._spPageContextInfo &&
+          global._spPageContextInfo.userId
+            ? Number(global._spPageContextInfo.userId)
+            : Number(item[clave]);
+        if (!isNaN(idUsuario) && idUsuario > 0) {
+          resultado[campo.nombreInterno + "Id"] = idUsuario;
+        } else {
+          omitidos.push(clave);
+        }
+        return;
+      }
+
+      if (campo.tipo.indexOf("Lookup") === 0) {
+        const idBusqueda = Number(item[clave]);
+        if (!isNaN(idBusqueda) && idBusqueda > 0) {
+          resultado[campo.nombreInterno + "Id"] = idBusqueda;
+        } else {
+          omitidos.push(clave);
+        }
+        return;
+      }
+
+      const valor = convertirValor(item[clave], campo);
+      if (valor === null && item[clave] !== null && item[clave] !== "") {
+        omitidos.push(clave);
+      } else {
+        resultado[campo.nombreInterno] = valor;
+      }
+    });
+
+    ultimoDiagnosticoEscritura = {
+      enviados: Object.keys(resultado),
+      tiposEnviados: Object.keys(resultado).map(function (nombreInterno) {
+        const campo = esquemaLista.find(function (itemEsquema) {
+          return itemEsquema.nombreInterno === nombreInterno.replace(/Id$/, "");
+        });
+        return {
+          columna: nombreInterno,
+          tipoSharePoint: campo ? campo.tipo : "Desconocido",
+          tipoJavaScript: typeof resultado[nombreInterno]
+        };
+      }),
+      omitidos: omitidos,
+      esquemaConsultado: Boolean(esquemaLista)
+    };
+    global.BitacoraDiagnosticoEscritura = ultimoDiagnosticoEscritura;
+    return resultado;
+  }
+
+  function esperar(ms) {
+    return new Promise(function (resolver) {
+      setTimeout(resolver, ms);
+    });
+  }
+
+  async function solicitar(url, opciones, intento) {
+    const numeroIntento = intento || 1;
+    const respuesta = await fetch(url, opciones);
+    if (
+      (respuesta.status === 429 || respuesta.status === 503) &&
+      numeroIntento <= CONFIG.reintentos
+    ) {
+      await esperar(500 * Math.pow(2, numeroIntento - 1));
+      return solicitar(url, opciones, numeroIntento + 1);
+    }
+    return respuesta;
+  }
+
+  async function detalleErrorSharePoint(respuesta) {
+    try {
+      if (!respuesta.clone) {
+        return "";
+      }
+      const datos = await respuesta.clone().json();
+      const error = datos.error || datos["odata.error"];
+      if (!error || !error.message) {
+        return "";
+      }
+      return typeof error.message === "string"
+        ? error.message
+        : error.message.value || "";
+    } catch (errorLectura) {
+      return "";
+    }
+  }
+
+  async function digest() {
+    const campo = document.getElementById("__REQUESTDIGEST");
+    if (campo && campo.value) {
+      return campo.value;
+    }
+
+    const respuesta = await solicitar(
+      urlSitio() + "/_api/contextinfo",
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: ODATA
+      }
+    );
+    if (!respuesta.ok) {
+      throw new Error(
+        "No fue posible obtener el X-RequestDigest (" +
+        respuesta.status +
+        ")."
+      );
+    }
+    const datos = await respuesta.json();
+    return datos.d.GetContextWebInformation.FormDigestValue;
+  }
+
+  async function obtenerTipoEntidad() {
+    if (tipoEntidadLista) {
+      return tipoEntidadLista;
+    }
+    const respuesta = await solicitar(
+      endpointLista() + "/ListItemEntityTypeFullName",
+      {
+        method: "GET",
+        credentials: "same-origin",
+        headers: ODATA
+      }
+    );
+    if (!respuesta.ok) {
+      throw new Error(
+        "No se pudo consultar el tipo de la lista Backlog (" +
+        respuesta.status +
+        ")."
+      );
+    }
+    const datos = await respuesta.json();
+    tipoEntidadLista = datos.d.ListItemEntityTypeFullName;
+    return tipoEntidadLista;
+  }
+
+  async function verificarConexion() {
+    if (!estaEnSharePoint()) {
+      throw new Error(
+        "La p\u00e1gina no est\u00e1 ejecut\u00e1ndose dentro del contexto de SharePoint."
+      );
+    }
+
+    const opciones = {
+      method: "GET",
+      credentials: "same-origin",
+      headers: ODATA
+    };
+    const resultados = await Promise.all([
+      solicitar(urlSitio() + "/_api/web?$select=Title,Url", opciones),
+      solicitar(
+        endpointLista() +
+          "?$select=Title,ItemCount,ListItemEntityTypeFullName",
+        opciones
+      ),
+      solicitar(
+        endpointLista() +
+          "/fields?$select=Title,InternalName,TypeAsString,Hidden,ReadOnlyField,Required",
+        opciones
+      )
+    ]);
+    const respuestaSitio = resultados[0];
+    const respuestaLista = resultados[1];
+    const respuestaCampos = resultados[2];
+
+    if (!respuestaSitio.ok) {
+      throw new Error(
+        "No se pudo acceder al sitio de SharePoint (HTTP " +
+          respuestaSitio.status +
+          ")."
+      );
+    }
+    if (!respuestaLista.ok) {
+      const motivoLista =
+        respuestaLista.status === 404
+          ? "La lista Backlog no existe con ese nombre."
+          : respuestaLista.status === 401 || respuestaLista.status === 403
+            ? "El usuario no tiene permiso para leer la lista Backlog."
+            : "SharePoint devolvi\u00f3 HTTP " + respuestaLista.status + ".";
+      throw new Error(motivoLista);
+    }
+    if (!respuestaCampos.ok) {
+      throw new Error(
+        "No se pudo consultar el esquema de Backlog (HTTP " +
+          respuestaCampos.status +
+          ")."
+      );
+    }
+
+    const datosSitio = await respuestaSitio.json();
+    const datosLista = await respuestaLista.json();
+    const datosCampos = await respuestaCampos.json();
+    const campos = datosCampos.d.results.map(function (campo) {
+      return {
+        titulo: campo.Title,
+        nombreInterno: campo.InternalName,
+        tipo: campo.TypeAsString,
+        oculto: campo.Hidden,
+        soloLectura: campo.ReadOnlyField,
+        obligatorio: campo.Required
+      };
+    });
+    esquemaLista = campos;
+    const columnasFaltantes = Object.keys(CAMPOS).filter(function (clave) {
+      return !resolverCampo(clave);
+    }).map(function (clave) {
+      return CAMPOS[clave].interno;
+    });
+    const columnasPersonaInvalidas = Object.keys(CAMPOS)
+      .filter(function (clave) {
+        return CAMPOS[clave].tipo === "persona";
+      })
+      .map(function (clave) {
+        return CAMPOS[clave].interno;
+      })
+      .filter(function (nombre) {
+        const claveCampo = Object.keys(CAMPOS).find(function (clave) {
+          return CAMPOS[clave].interno === nombre;
+        });
+        const campo = claveCampo ? resolverCampo(claveCampo) : null;
+        return campo && campo.tipo.indexOf("User") !== 0;
+      });
+
+    const advertencias = [];
+    if (columnasFaltantes.length > 0) {
+      advertencias.push(
+        "Revisar nombres internos: " + columnasFaltantes.join(", ")
+      );
+    }
+    if (columnasPersonaInvalidas.length > 0) {
+      advertencias.push(
+        "Revisar columnas Persona: " + columnasPersonaInvalidas.join(", ")
+      );
+    }
+
+    tipoEntidadLista = datosLista.d.ListItemEntityTypeFullName;
+    return {
+      sitio: datosSitio.d,
+      lista: datosLista.d,
+      campos: campos,
+      columnasFaltantes: columnasFaltantes,
+      columnasPersonaInvalidas: columnasPersonaInvalidas,
+      advertencias: advertencias,
+      urlLista:
+        urlSitio() + "/Lists/" + encodeURIComponent(CONFIG.lista) + "/AllItems.aspx"
+    };
+  }
+
+  async function obtenerTodos() {
+    let siguiente =
+      endpointLista() +
+      "/items?" +
+      parametrosLectura() +
+      "&$top=" +
+      String(CONFIG.tamanoPagina);
+    const resultados = [];
+
+    while (siguiente) {
+      const respuesta = await solicitar(siguiente, {
+        method: "GET",
+        credentials: "same-origin",
+        headers: ODATA
+      });
+      if (!respuesta.ok) {
+        const detalle = await detalleErrorSharePoint(respuesta);
+        throw new Error(
+          "No se pudo consultar la lista Backlog (HTTP " +
+          respuesta.status +
+          ")" +
+          (detalle ? ": " + detalle : ".")
+        );
+      }
+      const datos = await respuesta.json();
+      Array.prototype.push.apply(
+        resultados,
+        datos.d.results.map(desdeSharePoint)
+      );
+      siguiente = datos.d.__next || null;
+    }
+    return resultados;
+  }
+
+  async function obtenerPorId(id) {
+    const idSeguro = String(id).replace(/'/g, "''");
+    const consulta =
+      "?" +
+      parametrosLectura() +
+      "&$filter=Title eq '" +
+      encodeURIComponent(idSeguro) +
+      "'&$top=1";
+
+    const respuesta = await solicitar(
+      endpointLista() + "/items" + consulta,
+      {
+        method: "GET",
+        credentials: "same-origin",
+        headers: ODATA
+      }
+    );
+    if (!respuesta.ok) {
+      const detalle = await detalleErrorSharePoint(respuesta);
+      throw new Error(
+        "No se pudo consultar el requerimiento (HTTP " +
+          respuesta.status +
+          ")" +
+          (detalle ? ": " + detalle : ".")
+      );
+    }
+    const datos = await respuesta.json();
+    return datos.d.results.length
+      ? desdeSharePoint(datos.d.results[0])
+      : undefined;
+  }
+
+  async function crear(item) {
+    if (!esquemaLista) {
+      await verificarConexion();
+    }
+    const valores = await Promise.all([digest(), obtenerTipoEntidad()]);
+    const carga = haciaSharePoint(item);
+    const campoId = resolverCampo("id");
+    if (!campoId || !carga[campoId.nombreInterno]) {
+      throw new Error(
+        "La columna de identificaci\u00f3n (Title/ID REQ) no se pudo resolver en Backlog."
+      );
+    }
+    carga.__metadata = { type: valores[1] };
+
+    const respuesta = await solicitar(endpointLista() + "/items", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: Object.assign({}, ODATA, {
+        "Content-Type": "application/json;odata=verbose",
+        "X-RequestDigest": valores[0]
+      }),
+      body: JSON.stringify(carga)
+    });
+    if (!respuesta.ok) {
+      const detalle = await detalleErrorSharePoint(respuesta);
+      throw new Error(
+        "No se pudo crear el requerimiento (HTTP " +
+          respuesta.status +
+          ")" +
+          (detalle ? ": " + detalle : ".")
+      );
+    }
+    const datos = await respuesta.json();
+    return desdeSharePoint(datos.d);
+  }
+
+  async function actualizar(id, cambios) {
+    const existente = await obtenerPorId(id);
+    if (!existente) {
+      throw new Error("No se encontr\u00f3 el requerimiento " + id + ".");
+    }
+
+    if (!esquemaLista) {
+      await verificarConexion();
+    }
+    const valores = await Promise.all([digest(), obtenerTipoEntidad()]);
+    const carga = haciaSharePoint(cambios);
+    carga.__metadata = { type: valores[1] };
+
+    const respuesta = await solicitar(
+      endpointLista() + "/items(" + existente.spItemId + ")",
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: Object.assign({}, ODATA, {
+          "Content-Type": "application/json;odata=verbose",
+          "X-RequestDigest": valores[0],
+          "X-HTTP-Method": "MERGE",
+          "IF-MATCH": "*"
+        }),
+        body: JSON.stringify(carga)
+      }
+    );
+    if (!respuesta.ok) {
+      const detalle = await detalleErrorSharePoint(respuesta);
+      throw new Error(
+        "No se pudo actualizar el requerimiento (HTTP " +
+        respuesta.status +
+        ")" +
+        (detalle ? ": " + detalle : ".")
+      );
+    }
+    return obtenerPorId(id);
+  }
+
+  async function eliminar(id) {
+    const existente = await obtenerPorId(id);
+    if (!existente) {
+      return;
+    }
+    const valorDigest = await digest();
+    const respuesta = await solicitar(
+      endpointLista() + "/items(" + existente.spItemId + ")",
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: Object.assign({}, ODATA, {
+          "Content-Type": "application/json;odata=verbose",
+          "X-RequestDigest": valorDigest,
+          "X-HTTP-Method": "DELETE",
+          "IF-MATCH": "*"
+        })
+      }
+    );
+    if (!respuesta.ok) {
+      throw new Error(
+        "No se pudo eliminar el requerimiento (" + respuesta.status + ")."
+      );
+    }
+  }
+
+  const CLAVE_BITACORA = "backlog_bitacora";
+
+  function obtenerBitacora() {
+    const datos = localStorage.getItem(CLAVE_BITACORA);
+    return datos ? JSON.parse(datos) : [];
+  }
+
+  function agregarActividad(usuario, accion) {
+    const bitacora = obtenerBitacora();
+    bitacora.unshift({
+      usuario: usuario,
+      accion: accion,
+      fecha: new Date().toLocaleString("es-CO")
+    });
+    localStorage.setItem(CLAVE_BITACORA, JSON.stringify(bitacora));
+  }
+
+  global.Modelo = Object.freeze({
+    configuracion: CONFIG,
+    urlSitio: urlSitio,
+    estaEnSharePoint: estaEnSharePoint,
+    usuarioActual: usuarioActual,
+    verificarConexion: verificarConexion,
+    obtenerTodos: obtenerTodos,
+    obtenerPorId: obtenerPorId,
+    crear: crear,
+    actualizar: actualizar,
+    eliminar: eliminar,
+    obtenerBitacora: obtenerBitacora,
+    agregarActividad: agregarActividad,
+    obtenerDiagnosticoEscritura: function () {
+      return ultimoDiagnosticoEscritura;
+    }
+  });
+})(window);

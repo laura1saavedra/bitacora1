@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Bit&#225;cora de requerimientos de Apps Colombia integrada con SharePoint Online.">
+  <title>Bit&#225;cora | Backlog Apps Colombia</title>
+  <link rel="stylesheet"
+    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260728.1" />
+</head>
+<body>
+  <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
+
+  <div id="bitacora-app" class="app">
+    <aside class="sidebar" aria-label="Navegaci&#243;n principal">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">B</div>
+        <div>
+          <strong>Bit&#225;cora</strong>
+          <span>Apps Colombia</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="M&#243;dulos de la aplicaci&#243;n">
+        <p class="menu-label">MEN&#218;</p>
+
+        <button class="nav-item active" type="button" onclick="ViewManager.mostrarDashboard()">
+          <span class="ico" aria-hidden="true">&#x25A6;</span>
+          <span>Backlog</span>
+        </button>
+
+         <div class="nav-item"
+     onclick="ViewManager.mostrarMisRequerimientos()">
+
+    <span class="ico" aria-hidden="true">&#128203;</span>
+
+    <span>Mis requerimientos</span>
+
+</div>
+
+        <div class="nav-section admin-only">
+          <div class="nav-heading">
+            <span class="ico" aria-hidden="true">&#x2699;</span>
+            <span>Gesti&#243;n</span>
+          </div>
+          <button class="nav-sub" type="button" onclick="ViewManager.mostrarGestion()">Asignar responsables</button>
+          <button class="nav-sub" type="button" onclick="ViewManager.mostrarGestion()">Asignar mentores</button>
+          <button class="nav-sub" type="button" onclick="ViewManager.mostrarGestion()">Cambiar estados</button>
+          <button class="nav-sub" type="button" onclick="ViewManager.mostrarGestion()">Observaciones</button>
+        </div>
+
+        <button class="nav-item" type="button">
+          <span class="ico" aria-hidden="true">&#x25F4;</span>
+          <span>Historial</span>
+        </button>
+        <button class="nav-item" type="button">
+          <span class="ico" aria-hidden="true">&#x25A7;</span>
+          <span>Documentos</span>
+        </button>
+        <button class="nav-item admin-only" type="button" onclick="ViewManager.mostrarDashboard()">
+          <span class="ico" aria-hidden="true">&#x25A5;</span>
+          <span>Indicadores</span>
+        </button>
+        <button class="nav-item" type="button">
+          <span class="ico" aria-hidden="true">&#x25C9;</span>
+          <span>Notificaciones</span>
+        </button>
+        <button class="nav-item" type="button">
+          <span class="ico" aria-hidden="true">?</span>
+          <span>Ayuda</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="session-card">
+          <span class="session-avatar" aria-hidden="true">M365</span>
+          <div>
+            <strong id="usuario-sesion">Usuario Microsoft 365</strong>
+            <span id="rol-sesion">Validando permisos&#8230;</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main" id="contenido-principal">
+      <div class="environment-note" id="estado-conexion" role="status">
+        <span class="status-dot" aria-hidden="true"></span>
+        Datos administrados desde SharePoint Online
+      </div>
+
+      <section id="view-dashboard" aria-labelledby="titulo-dashboard">
+        <header class="top-row">
+          <div>
+            <p class="eyebrow">BACKLOG APPS COLOMBIA</p>
+            <h1 id="titulo-dashboard">Bit&#225;cora de requerimientos</h1>
+            <p class="subtitle">Resumen general y seguimiento de las solicitudes registradas.</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn-secondary" id="btn-actualizar" type="button" onclick="cargarDatosDashboard()">
+              Actualizar
+            </button>
+            <button class="btn-primary" id="btn-crear-requerimiento" type="button">
+              Crear requerimiento
+            </button>
+          </div>
+        </header>
+
+        <div class="cards" aria-label="Indicadores de requerimientos">
+          <article class="card">
+            <div class="icon blue" aria-hidden="true">&#x25A4;</div>
+            <div>
+              <div class="num" id="total-requerimientos">&#8212;</div>
+              <div class="label">Total requerimientos</div>
+            </div>
+          </article>
+          <article class="card">
+            <div class="icon orange" aria-hidden="true">&#x25F7;</div>
+            <div>
+              <div class="num" id="total-pendientes">&#8212;</div>
+              <div class="label">Pendientes</div>
+            </div>
+          </article>
+          <article class="card">
+            <div class="icon teal" aria-hidden="true">&#x25C8;</div>
+            <div>
+              <div class="num" id="total-en-pruebas">&#8212;</div>
+              <div class="label">Pruebas</div>
+            </div>
+          </article>
+          <article class="card">
+            <div class="icon indigo" aria-hidden="true">&#x21E7;</div>
+            <div>
+              <div class="num" id="total-pruebas">&#8212;</div>
+              <div class="label">Esperando documentaci&#243;n usuario</div>
+            </div>
+          </article>
+          <article class="card">
+            <div class="icon purple" aria-hidden="true">&#x25CC;</div>
+            <div>
+              <div class="num" id="total-cierre-usuario">&#8212;</div>
+              <div class="label">Esperando cierre usuario</div>
+            </div>
+          </article>
+          <article class="card">
+            <div class="icon green" aria-hidden="true">&#x2713;</div>
+            <div>
+              <div class="num" id="total-finalizados">&#8212;</div>
+              <div class="label">Finalizados</div>
+            </div>
+          </article>
+        </div>
+
+        <section class="panel" aria-labelledby="titulo-listado">
+          <div class="panel-heading">
+            <div>
+              <h2 id="titulo-listado">Requerimientos registrados</h2>
+              <p>Consulta, filtra y gestiona la informaci&#243;n disponible para tu rol.</p>
+            </div>
+          </div>
+
+          <div class="filters" aria-label="Filtros del listado">
+            <label class="search" for="buscador">
+              <span aria-hidden="true">&#x2315;</span>
+              <input type="search" id="buscador" placeholder="Buscar por ID, APP, asunto o responsable">
+            </label>
+            <select class="fake-select" id="filtro-app" aria-label="Filtrar por aplicaci&#243;n">
+              <option value="">Todas las APP</option>
+            </select>
+            <select class="fake-select" id="filtro-responsable" aria-label="Filtrar por responsable">
+              <option value="">Todos los responsables</option>
+            </select>
+            <select class="fake-select" id="filtro-estado" aria-label="Filtrar por estado">
+              <option value="">Todos los estados</option>
+            </select>
+            <select class="fake-select" id="filtro-prioridad" aria-label="Filtrar por prioridad">
+              <option value="">Todas las prioridades</option>
+            </select>
+            <select class="fake-select filter-placeholder" id="filtro-extra" aria-label="Filtro adicional">
+              <option value="">M&#225;s filtros</option>
+            </select>
+            <button class="btn-link danger-link" id="btn-limpiar-filtros" type="button">&#215; Limpiar filtros</button>
+            <button class="btn-export" id="btn-exportar" type="button">&#x21E9; Exportar CSV</button>
+          </div>
+
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">ID REQ.</th>
+                  <th scope="col">APP</th>
+                  <th scope="col">Tipo de servicio</th>
+                  <th scope="col">Asunto</th>
+                  <th scope="col">Solicitado por</th>
+                  <th scope="col">Responsable</th>
+                  <th scope="col">Prioridad</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col">F. solicitud</th>
+                  <th scope="col">F. cierre</th>
+                  <th scope="col">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-requerimientos">
+                <tr class="empty-row">
+                  <td colspan="11">Consultando requerimientos en SharePoint&#8230;</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <footer class="table-footer">
+            <div id="texto-paginacion">Sin resultados cargados</div>
+            <div class="pagination" id="controles-paginacion" aria-label="Paginaci&#243;n"></div>
+          </footer>
+        </section>
+
+        <div class="bottom-row">
+          <section class="panel" aria-labelledby="titulo-actividad">
+            <h2 id="titulo-actividad">Actividad reciente</h2>
+            <div id="lista-actividad">
+              <p class="empty-message">La actividad del Backlog aparecer&#225; aqu&#237;.</p>
+            </div>
+            <button class="btn-link see-all" id="ver-toda-actividad" type="button">Ver toda la actividad</button>
+          </section>
+
+          <section class="panel" aria-labelledby="titulo-estados">
+            <h2 id="titulo-estados">Ciclo de atenci&#243;n</h2>
+            <div class="flow" id="flujo-estados">
+              <div class="flow-box"><strong>Pendiente</strong><span>Solicitud registrada</span></div>
+              <span class="flow-arrow" aria-hidden="true">&#8594;</span>
+              <div class="flow-box"><strong>En gesti&#243;n</strong><span>Asignaci&#243;n y atenci&#243;n</span></div>
+              <span class="flow-arrow" aria-hidden="true">&#8594;</span>
+              <div class="flow-box"><strong>En pruebas</strong><span>Validaci&#243;n de soluci&#243;n</span></div>
+              <span class="flow-arrow" aria-hidden="true">&#8594;</span>
+              <div class="flow-box"><strong>Cierre usuario</strong><span>Aprobaci&#243;n del solicitante</span></div>
+              <span class="flow-arrow" aria-hidden="true">&#8594;</span>
+              <div class="flow-box"><strong>Finalizado</strong><span>Requerimiento cerrado</span></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="view-crear-requerimiento" aria-labelledby="titulo-crear" hidden>
+        <header class="top-row">
+          <div>
+            <p class="eyebrow" id="modo-formulario">NUEVA SOLICITUD</p>
+            <h1 id="titulo-crear">Registrar requerimiento</h1>
+            <p class="subtitle" id="subtitulo-formulario">Los campos marcados con * son obligatorios.</p>
+          </div>
+        </header>
+
+        <div id="form-requerimiento">
+          <section class="panel" aria-labelledby="titulo-info-general">
+            <div class="panel-heading">
+              <div>
+                <h2 id="titulo-info-general">Informaci&#243;n general</h2>
+                <p>Describe la necesidad que debe atender el equipo Apps Colombia.</p>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="id">ID requerimiento</label>
+                <input type="text" id="id" readonly>
+              </div>
+              <div class="form-group">
+                <label for="app">APP *</label>
+                <select id="app" required>
+                  <option value="">Seleccione una aplicaci&#243;n</option>
+                  <option>Sem&#225;foro Web</option>
+                  <option>Monitor Master</option>
+                  <option>Automatizaciones</option>
+                  <option>Incidentes Mayores</option>
+                  <option>Kibana</option>
+                  <option>TalentIA</option>
+                  <option>Convocatorias</option>
+                  <option>Dynatrace</option>
+                  <option>Salesforce</option>
+                  <option>Gitea</option>
+                  <option>Timex</option>
+                  <option>SharePoint</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="tipoServicio">Tipo de servicio *</label>
+                <select id="tipoServicio" required>
+                  <option value="">Seleccione un tipo</option>
+                  <option>Incidente</option>
+                  <option>Nuevo requerimiento</option>
+                  <option>Soporte</option>
+                  <option>Mejora</option>
+                  <option>Desarrollo</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="casoOrigen">Caso origen</label>
+                <input type="text" id="casoOrigen" placeholder="Si aplica, ingresa el n&#250;mero del requerimiento de soporte">
+              </div>
+              <div class="form-group full">
+                <label for="asunto">Asunto *</label>
+                <input type="text" id="asunto" maxlength="180" required placeholder="Resumen corto del requerimiento">
+              </div>
+              <div class="form-group full">
+                <label for="descripcion">Descripci&#243;n de la solicitud *</label>
+                <textarea id="descripcion" rows="6" maxlength="4000" required placeholder="Describe el contexto, la necesidad y el resultado esperado"></textarea>
+              </div>
+              <div class="form-group">
+                <label for="prioridad">Prioridad *</label>
+                <select id="prioridad" required>
+                  <option value="">Seleccione una prioridad</option>
+                  <option value="1">1 - Cr&#237;tica</option>
+                  <option value="2">2 - Muy alta</option>
+                  <option value="3">3 - Alta</option>
+                  <option value="4">4 - Media alta</option>
+                  <option value="5">5 - Media</option>
+                  <option value="6">6 - Media baja</option>
+                  <option value="7">7 - Baja</option>
+                  <option value="8">8 - Muy baja</option>
+                </select>
+              </div>
+              <div class="form-group full">
+                <label for="archivosAdjuntos">Archivos adjuntos</label>
+                <div class="file-field">
+                  <input type="file" id="archivosAdjuntos" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
+                  <span>PDF, Word, Excel o im&#225;genes.</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" aria-labelledby="titulo-info-registro">
+            <div class="panel-heading">
+              <div>
+                <h2 id="titulo-info-registro">Informaci&#243;n del registro</h2>
+                <p>Estos datos se completan autom&#225;ticamente desde Microsoft 365 y SharePoint.</p>
+              </div>
+            </div>
+            <div class="form-grid three-columns">
+              <div class="form-group">
+                <label for="solicitadoPor">Solicitado por</label>
+                <input type="text" id="solicitadoPor" readonly>
+              </div>
+              <div class="form-group">
+                <label for="estado">Estado inicial</label>
+                <input type="text" id="estado" readonly>
+              </div>
+              <div class="form-group">
+                <label for="fechaSolicitud">Fecha de solicitud</label>
+                <input type="text" id="fechaSolicitud" readonly>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel form-actions-panel">
+            <div class="acciones-formulario">
+              <button class="btn-secondary" id="btn-cancelar" type="button">Cancelar</button>
+              <button class="btn-secondary" id="btn-limpiar" type="button">Limpiar</button>
+              <button class="btn-primary" id="btn-guardar" type="button">Guardar requerimiento</button>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="view-mis-requerimientos" aria-labelledby="titulo-mis-requerimientos" hidden>
+        <header class="top-row">
+          <div>
+            <p class="eyebrow">SEGUIMIENTO PERSONAL</p>
+            <h1 id="titulo-mis-requerimientos">Mis requerimientos</h1>
+            <p class="subtitle">Solicitudes creadas por el usuario autenticado.</p>
+          </div>
+          <button class="btn-primary" type="button" onclick="ViewManager.mostrarFormularioCrear()">Crear requerimiento</button>
+        </header>
+        <section class="panel">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">ID REQ.</th>
+                  <th scope="col">APP</th>
+                  <th scope="col">Tipo de servicio</th>
+                  <th scope="col">Asunto</th>
+                  <th scope="col">Descripci&#243;n de la solicitud</th>
+                  <th scope="col">Solicitado por</th>
+                  <th scope="col">Responsable</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-mis-requerimientos">
+                <tr class="empty-row">
+                  <td colspan="9">Consultando tus requerimientos&#8230;</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="view-gestion" class="admin-only" aria-labelledby="titulo-gestion" hidden>
+        <header class="top-row">
+          <div>
+            <p class="eyebrow">ADMINISTRACI&#211;N</p>
+            <h1 id="titulo-gestion">Gesti&#243;n de requerimientos</h1>
+            <p class="subtitle">Asigna responsables y mentores, actualiza estados y registra observaciones.</p>
+          </div>
+        </header>
+        <section class="panel">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">ID REQ.</th>
+                  <th scope="col">Asunto</th>
+                  <th scope="col">Responsable</th>
+                  <th scope="col">Mentor</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col">Observaciones</th>
+                  <th scope="col">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-gestion">
+                <tr class="empty-row">
+                  <td colspan="7">Consultando requerimientos administrables&#8230;</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div class="modal-overlay" id="modal-detalle" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-detalle">
+        <header class="modal-header">
+          <div>
+            <p class="eyebrow">INFORMACI&#211;N DEL REQUERIMIENTO</p>
+            <h2 id="titulo-modal-detalle">Detalle del requerimiento</h2>
+          </div>
+          <button class="modal-close" id="modal-cerrar" type="button" aria-label="Cerrar detalle">&#215;</button>
+        </header>
+        <div class="modal-body" id="modal-contenido"></div>
+        <footer class="modal-footer">
+          <button class="btn-secondary" id="modal-cerrar-btn" type="button">Cerrar</button>
+        </footer>
+      </section>
+    </div>
+  </div>
+
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260728.1"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260728.1"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260728.1"></script>
+</body>
+</html>
