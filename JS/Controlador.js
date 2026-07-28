@@ -11,6 +11,8 @@
   let observadorChromeSharePoint = null;
   let documentoObservadoSharePoint = null;
   let requerimientoEnEdicion = null;
+  let dialogoMensajeActual = null;
+  let focoAntesDelDialogo = null;
 
   const SELECTORES_CHROME_SHAREPOINT = [
     "#suiteBar",
@@ -36,7 +38,12 @@
       if (
         global.parent &&
         global.parent !== global &&
-        global.parent.document
+        global.parent.document &&
+        (
+          global.parent.document.getElementById("s4-workspace") ||
+          global.parent.document.getElementById("s4-ribbonrow") ||
+          global.parent.document.getElementById("contentBox")
+        )
       ) {
         return global.parent.document;
       }
@@ -275,10 +282,11 @@
       console.error("Carga del dashboard:", error);
       Vista.renderizarTarjetas([]);
       Vista.renderizarTabla([]);
-      alert(
-        "No se pudieron cargar los requerimientos desde SharePoint. " +
-        error.message
-      );
+      await mostrarAlerta({
+        icon: "error",
+        title: "No se pudieron cargar los requerimientos",
+        text: "SharePoint devolvi\u00f3 el siguiente error: " + error.message
+      });
     }
   }
 
@@ -328,12 +336,20 @@
     try {
       const req = await Modelo.obtenerPorId(id);
       if (!req) {
-        alert("No se encontr\u00f3 el requerimiento.");
+        await mostrarAlerta({
+          icon: "warning",
+          title: "Requerimiento no encontrado",
+          text: "No fue posible encontrar el requerimiento seleccionado."
+        });
         return;
       }
       Vista.mostrarDetalle(req);
     } catch (error) {
-      alert("No se pudo consultar el detalle. " + error.message);
+      await mostrarAlerta({
+        icon: "error",
+        title: "No se pudo consultar el detalle",
+        text: error.message
+      });
     }
   }
 
@@ -345,10 +361,90 @@
     });
   }
 
+  function cerrarDialogoMensaje(confirmado) {
+    if (!dialogoMensajeActual) {
+      return;
+    }
+
+    const entrada = document.getElementById("entrada-modal-mensaje");
+    const validacion = document.getElementById("validacion-modal-mensaje");
+    const valor = entrada.value.trim();
+
+    if (confirmado && dialogoMensajeActual.solicitaValor && !valor) {
+      validacion.textContent = "Debe ingresar un nombre.";
+      validacion.hidden = false;
+      entrada.focus();
+      return;
+    }
+
+    const resolver = dialogoMensajeActual.resolver;
+    document.getElementById("modal-mensaje").hidden = true;
+    dialogoMensajeActual = null;
+    if (focoAntesDelDialogo && typeof focoAntesDelDialogo.focus === "function") {
+      focoAntesDelDialogo.focus();
+    }
+    focoAntesDelDialogo = null;
+    resolver({
+      isConfirmed: confirmado,
+      value: confirmado ? valor : ""
+    });
+  }
+
+  function mostrarDialogo(opciones) {
+    const overlay = document.getElementById("modal-mensaje");
+    const icono = document.getElementById("icono-modal-mensaje");
+    const entrada = document.getElementById("entrada-modal-mensaje");
+    const campo = document.getElementById("campo-modal-mensaje");
+    const validacion = document.getElementById("validacion-modal-mensaje");
+    const cancelar = document.getElementById("cancelar-modal-mensaje");
+    const confirmar = document.getElementById("confirmar-modal-mensaje");
+    const tipo = ["success", "error", "warning", "info"]
+      .indexOf(opciones.icon) !== -1
+        ? opciones.icon
+        : "info";
+    const simbolos = {
+      success: "\u2713",
+      error: "\u00d7",
+      warning: "!",
+      info: "i"
+    };
+
+    focoAntesDelDialogo = document.activeElement;
+    icono.className = "mensaje-icono " + tipo;
+    icono.textContent = simbolos[tipo];
+    document.getElementById("titulo-modal-mensaje").textContent =
+      opciones.title || "Mensaje";
+    document.getElementById("texto-modal-mensaje").textContent =
+      opciones.text || "";
+    campo.hidden = !opciones.input;
+    entrada.value = opciones.inputValue || "";
+    entrada.placeholder = opciones.inputPlaceholder || "";
+    validacion.hidden = true;
+    validacion.textContent = "";
+    cancelar.hidden = !opciones.showCancelButton;
+    cancelar.textContent = opciones.cancelButtonText || "Cancelar";
+    confirmar.textContent = opciones.confirmButtonText || "Aceptar";
+    overlay.hidden = false;
+
+    return new Promise(function (resolver) {
+      dialogoMensajeActual = {
+        resolver: resolver,
+        solicitaValor: Boolean(opciones.input)
+      };
+      global.setTimeout(function () {
+        if (opciones.input) {
+          entrada.focus();
+        } else {
+          confirmar.focus();
+        }
+      }, 0);
+    });
+  }
+
   function mostrarAlerta(opciones) {
-    const mensaje = opciones.text || opciones.title || "";
-    global.alert(mensaje);
-    return Promise.resolve();
+    return mostrarDialogo(opciones).then(function () {
+      return undefined;
+    });
   }
 
   async function prepararFormulario() {
@@ -402,11 +498,16 @@
 
   function esRequerimientoPropio(req) {
     const usuario = Modelo.usuarioActual();
-    const solicitante = String(req.solicitadoPor || "").toLowerCase();
+    const solicitantes = String(req.solicitadoPor || "")
+      .split(";")
+      .map(function (valor) {
+        return valor.trim().toLowerCase();
+      })
+      .filter(Boolean);
     return [usuario.nombre, usuario.correo]
       .filter(Boolean)
       .some(function (valor) {
-        return String(valor).toLowerCase() === solicitante;
+        return solicitantes.indexOf(String(valor).trim().toLowerCase()) !== -1;
       });
   }
 
@@ -414,11 +515,19 @@
     try {
       const req = await Modelo.obtenerPorId(id);
       if (!req) {
-        alert("No se encontr\u00f3 el requerimiento.");
+        await mostrarAlerta({
+          icon: "warning",
+          title: "Requerimiento no encontrado",
+          text: "No fue posible encontrar el requerimiento seleccionado."
+        });
         return;
       }
       if (!esRequerimientoPropio(req)) {
-        alert("Solo puede editar requerimientos solicitados por usted.");
+        await mostrarAlerta({
+          icon: "warning",
+          title: "Edici\u00f3n no permitida",
+          text: "Solo puede editar requerimientos solicitados por usted."
+        });
         return;
       }
 
@@ -446,7 +555,11 @@
 
       Vista.mostrarFormularioEdicion();
     } catch (error) {
-      alert("No se pudo abrir el requerimiento para editar. " + error.message);
+      await mostrarAlerta({
+        icon: "error",
+        title: "No se pudo abrir el requerimiento",
+        text: error.message
+      });
     }
   }
 
@@ -458,12 +571,54 @@
       asunto: document.getElementById("asunto").value.trim(),
       descripcion: document.getElementById("descripcion").value.trim(),
       casoOrigen: document.getElementById("casoOrigen").value.trim(),
-      solicitadoPor: document.getElementById("solicitadoPor").value,
+      solicitadoPor: document.getElementById("solicitadoPor").value.trim(),
       responsable: "No asignado",
       prioridad: document.getElementById("prioridad").value,
       estado: document.getElementById("estado").value,
       fechaSolicitud: document.getElementById("fechaSolicitud").value
     };
+  }
+
+  async function agregarPersona() {
+    const resultado = await mostrarDialogo({
+      icon: "info",
+      title: "Agregar persona",
+      text: "Ingrese el nombre de la persona que participara en el requerimiento.",
+      input: true,
+      inputPlaceholder: "Ejemplo: Cristian Pardo",
+      showCancelButton: true,
+      confirmButtonText: "Agregar",
+      cancelButtonText: "Cancelar"
+    });
+
+    if (!resultado.isConfirmed) {
+      return;
+    }
+    const nombre = resultado.value;
+
+    const campo = document.getElementById("solicitadoPor");
+    const personas = campo.value
+      .split(";")
+      .map(function (persona) {
+        return persona.trim();
+      })
+      .filter(Boolean);
+    const yaExiste = personas.some(function (persona) {
+      return persona.toLowerCase() === nombre.toLowerCase();
+    });
+
+    if (yaExiste) {
+      mostrarAlerta({
+        icon: "info",
+        title: "Persona ya agregada",
+        text: "La persona seleccionada ya hace parte del requerimiento.",
+        confirmButtonColor: "#2f6fed"
+      });
+      return;
+    }
+
+    personas.push(nombre);
+    campo.value = personas.join("; ");
   }
 
   function formularioValido(datos) {
@@ -509,19 +664,24 @@
           asunto: datos.asunto,
           descripcion: datos.descripcion,
           casoOrigen: datos.casoOrigen,
-          prioridad: datos.prioridad
+          prioridad: datos.prioridad,
+          solicitadoPor: datos.solicitadoPor
         });
         Modelo.agregarActividad(
           Modelo.usuarioActual().nombre,
           "Edit\u00f3 el requerimiento " + requerimientoEnEdicion.id
         );
         requerimientoEnEdicion = null;
-        alert("Requerimiento actualizado correctamente.");
+        await mostrarAlerta({
+          icon: "success",
+          title: "Requerimiento actualizado",
+          text: "Los cambios fueron guardados correctamente."
+        });
         Vista.mostrarMisRequerimientos();
       } else {
         await Modelo.crear(datos);
         Modelo.agregarActividad(
-          datos.solicitadoPor,
+          Modelo.usuarioActual().nombre,
           "Cre\u00f3 el requerimiento " + datos.id + " - " + datos.asunto
         );
         await mostrarAlerta({
@@ -538,7 +698,11 @@
         Vista.mostrarDashboard();
       }
     } catch (error) {
-      alert("No se pudo guardar el requerimiento. " + error.message);
+      await mostrarAlerta({
+        icon: "error",
+        title: "No se pudo guardar el requerimiento",
+        text: error.message
+      });
     }
   }
 
@@ -576,10 +740,18 @@
         Modelo.usuarioActual().nombre,
         "Actualiz\u00f3 el requerimiento " + id
       );
-      alert("Requerimiento actualizado correctamente.");
+      await mostrarAlerta({
+        icon: "success",
+        title: "Requerimiento actualizado",
+        text: "Los cambios fueron guardados correctamente."
+      });
       await cargarGestion();
     } catch (error) {
-      alert("No se pudo actualizar el requerimiento. " + error.message);
+      await mostrarAlerta({
+        icon: "error",
+        title: "No se pudo actualizar el requerimiento",
+        text: error.message
+      });
     }
   }
 
@@ -589,6 +761,9 @@
     }
     eventosRegistrados = true;
 
+    document
+      .getElementById("btnAgregarPersona")
+      .addEventListener("click", agregarPersona);
     document.getElementById("buscador").addEventListener("input", aplicarFiltros);
     ["filtro-app", "filtro-responsable", "filtro-estado", "filtro-prioridad"]
       .forEach(function (id) {
@@ -597,6 +772,23 @@
     document
       .getElementById("btn-limpiar-filtros")
       .addEventListener("click", limpiarFiltros);
+    document
+      .getElementById("btn-actualizar")
+      .addEventListener("click", cargarDashboard);
+    document.querySelectorAll("[data-vista]").forEach(function (boton) {
+      boton.addEventListener("click", function () {
+        const vista = boton.dataset.vista;
+        if (vista === "dashboard") {
+          Vista.mostrarDashboard();
+        } else if (vista === "mis-requerimientos") {
+          Vista.mostrarMisRequerimientos();
+        } else if (vista === "gestion") {
+          Vista.mostrarGestion();
+        } else if (vista === "crear") {
+          Vista.mostrarFormularioCrear();
+        }
+      });
+    });
     document
       .getElementById("btn-crear-requerimiento")
       .addEventListener("click", Vista.mostrarFormularioCrear);
@@ -656,6 +848,7 @@
       });
 
     const overlay = document.getElementById("modal-detalle");
+    const overlayMensaje = document.getElementById("modal-mensaje");
     document
       .getElementById("modal-cerrar")
       .addEventListener("click", Vista.cerrarDetalle);
@@ -667,9 +860,36 @@
         Vista.cerrarDetalle();
       }
     });
+    document
+      .getElementById("confirmar-modal-mensaje")
+      .addEventListener("click", function () {
+        cerrarDialogoMensaje(true);
+      });
+    document
+      .getElementById("cancelar-modal-mensaje")
+      .addEventListener("click", function () {
+        cerrarDialogoMensaje(false);
+      });
+    document
+      .getElementById("entrada-modal-mensaje")
+      .addEventListener("keydown", function (evento) {
+        if (evento.key === "Enter") {
+          evento.preventDefault();
+          cerrarDialogoMensaje(true);
+        }
+      });
+    overlayMensaje.addEventListener("click", function (evento) {
+      if (evento.target === overlayMensaje) {
+        cerrarDialogoMensaje(false);
+      }
+    });
     document.addEventListener("keydown", function (evento) {
-      if (evento.key === "Escape" && !overlay.hidden) {
-        Vista.cerrarDetalle();
+      if (evento.key === "Escape") {
+        if (!overlayMensaje.hidden) {
+          cerrarDialogoMensaje(false);
+        } else if (!overlay.hidden) {
+          Vista.cerrarDetalle();
+        }
       }
     });
   }

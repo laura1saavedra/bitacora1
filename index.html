@@ -6,7 +6,7 @@
   <meta name="description" content="Bit&#225;cora de requerimientos de Apps Colombia integrada con SharePoint Online.">
   <title>Bit&#225;cora | Backlog Apps Colombia</title>
   <link rel="stylesheet"
-    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260728.1" />
+    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260728.3" />
 </head>
 <body>
   <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
@@ -24,29 +24,25 @@
       <nav class="sidebar-nav" aria-label="M&#243;dulos de la aplicaci&#243;n">
         <p class="menu-label">MEN&#218;</p>
 
-        <button class="nav-item active" type="button" onclick="ViewManager.mostrarDashboard()">
+        <button class="nav-item active" type="button" data-vista="dashboard">
           <span class="ico" aria-hidden="true">&#x25A6;</span>
           <span>Backlog</span>
         </button>
 
-         <div class="nav-item"
-     onclick="ViewManager.mostrarMisRequerimientos()">
-
-    <span class="ico" aria-hidden="true">&#128203;</span>
-
-    <span>Mis requerimientos</span>
-
-</div>
+        <button class="nav-item" type="button" data-vista="mis-requerimientos">
+          <span class="ico" aria-hidden="true">&#128203;</span>
+          <span>Mis requerimientos</span>
+        </button>
 
         <div class="nav-section admin-only">
           <div class="nav-heading">
             <span class="ico" aria-hidden="true">&#x2699;</span>
             <span>Gesti&#243;n</span>
           </div>
-          <button class="nav-sub" type="button" onclick="ViewManager.mostrarGestion()">Asignar responsables</button>
-          <button class="nav-sub" type="button" onclick="ViewManager.mostrarGestion()">Asignar mentores</button>
-          <button class="nav-sub" type="button" onclick="ViewManager.mostrarGestion()">Cambiar estados</button>
-          <button class="nav-sub" type="button" onclick="ViewManager.mostrarGestion()">Observaciones</button>
+          <button class="nav-sub" type="button" data-vista="gestion">Asignar responsables</button>
+          <button class="nav-sub" type="button" data-vista="gestion">Asignar mentores</button>
+          <button class="nav-sub" type="button" data-vista="gestion">Cambiar estados</button>
+          <button class="nav-sub" type="button" data-vista="gestion">Observaciones</button>
         </div>
 
         <button class="nav-item" type="button">
@@ -57,7 +53,7 @@
           <span class="ico" aria-hidden="true">&#x25A7;</span>
           <span>Documentos</span>
         </button>
-        <button class="nav-item admin-only" type="button" onclick="ViewManager.mostrarDashboard()">
+        <button class="nav-item admin-only" type="button" data-vista="dashboard">
           <span class="ico" aria-hidden="true">&#x25A5;</span>
           <span>Indicadores</span>
         </button>
@@ -96,7 +92,7 @@
             <p class="subtitle">Resumen general y seguimiento de las solicitudes registradas.</p>
           </div>
           <div class="header-actions">
-            <button class="btn-secondary" id="btn-actualizar" type="button" onclick="cargarDatosDashboard()">
+            <button class="btn-secondary" id="btn-actualizar" type="button">
               Actualizar
             </button>
             <button class="btn-primary" id="btn-crear-requerimiento" type="button">
@@ -336,7 +332,12 @@
             <div class="form-grid three-columns">
               <div class="form-group">
                 <label for="solicitadoPor">Solicitado por</label>
-                <input type="text" id="solicitadoPor" readonly>
+                <div class="solicitantes-container">
+                  <textarea id="solicitadoPor" rows="4" readonly></textarea>
+                  <button class="btn-secondary" id="btnAgregarPersona" type="button">
+                    + Agregar persona
+                  </button>
+                </div>
               </div>
               <div class="form-group">
                 <label for="estado">Estado inicial</label>
@@ -366,7 +367,7 @@
             <h1 id="titulo-mis-requerimientos">Mis requerimientos</h1>
             <p class="subtitle">Solicitudes creadas por el usuario autenticado.</p>
           </div>
-          <button class="btn-primary" type="button" onclick="ViewManager.mostrarFormularioCrear()">Crear requerimiento</button>
+          <button class="btn-primary" type="button" data-vista="crear">Crear requerimiento</button>
         </header>
         <section class="panel">
           <div class="table-scroll">
@@ -442,10 +443,33 @@
         </footer>
       </section>
     </div>
+
+    <div class="modal-overlay" id="modal-mensaje" hidden>
+      <section class="modal modal-mensaje" role="dialog" aria-modal="true"
+        aria-labelledby="titulo-modal-mensaje" aria-describedby="texto-modal-mensaje">
+        <div class="mensaje-icono" id="icono-modal-mensaje" aria-hidden="true"></div>
+        <h2 id="titulo-modal-mensaje"></h2>
+        <p id="texto-modal-mensaje"></p>
+        <div class="mensaje-campo" id="campo-modal-mensaje" hidden>
+          <label for="entrada-modal-mensaje">Nombre de la persona</label>
+          <input id="entrada-modal-mensaje" type="text" autocomplete="off"
+            placeholder="Ejemplo: Cristian Pardo">
+          <p class="mensaje-validacion" id="validacion-modal-mensaje" role="alert" hidden></p>
+        </div>
+        <footer class="mensaje-acciones">
+          <button class="btn-secondary" id="cancelar-modal-mensaje" type="button" hidden>
+            Cancelar
+          </button>
+          <button class="btn-primary" id="confirmar-modal-mensaje" type="button">
+            Aceptar
+          </button>
+        </footer>
+      </section>
+    </div>
   </div>
 
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260728.1"></script>
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260728.1"></script>
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260728.1"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260728.2"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260728.2"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260728.4"></script>
 </body>
 </html>

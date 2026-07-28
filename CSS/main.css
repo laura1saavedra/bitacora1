@@ -929,9 +929,29 @@ body {
   color: #5e6b80;
 }
 
+.form-group textarea[readonly] {
+  background: #f4f6f9;
+  color: #5e6b80;
+}
+
 .form-group textarea {
   min-height: 130px;
   resize: vertical;
+}
+
+.solicitantes-container {
+  display: flex;
+  align-items: stretch;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.solicitantes-container textarea {
+  min-height: 96px;
+}
+
+.solicitantes-container .btn-secondary {
+  align-self: flex-start;
 }
 
 .file-field {
@@ -1079,6 +1099,109 @@ body {
   border-top: 1px solid var(--line-soft);
 }
 
+.modal-mensaje {
+  width: min(460px, 100%);
+  padding: 30px;
+  text-align: center;
+  animation: entrada-modal 180ms ease-out;
+}
+
+.mensaje-icono {
+  display: grid;
+  width: 70px;
+  height: 70px;
+  margin: 0 auto 18px;
+  place-items: center;
+  border: 4px solid currentColor;
+  border-radius: 50%;
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.mensaje-icono.success {
+  color: #168a52;
+}
+
+.mensaje-icono.error {
+  color: var(--danger);
+}
+
+.mensaje-icono.warning {
+  color: #d18a05;
+}
+
+.mensaje-icono.info {
+  color: var(--blue-600);
+}
+
+.modal-mensaje h2 {
+  margin: 0 0 10px;
+  color: var(--navy-950);
+  font-size: 23px;
+}
+
+.modal-mensaje > p {
+  margin: 0;
+  color: #5e6b80;
+  line-height: 1.55;
+}
+
+.mensaje-campo {
+  margin-top: 22px;
+  text-align: left;
+}
+
+.mensaje-campo label {
+  display: block;
+  margin-bottom: 7px;
+  color: #34445e;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.mensaje-campo input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #d5dce7;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+}
+
+.mensaje-campo input:focus {
+  border-color: var(--blue-600);
+  box-shadow: 0 0 0 3px rgba(36, 107, 216, 0.12);
+  outline: 0;
+}
+
+.mensaje-validacion {
+  margin: 7px 0 0;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.mensaje-acciones {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+@keyframes entrada-modal {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @media (max-width: 1180px) {
   .cards {
     grid-template-columns: repeat(3, minmax(160px, 1fr));
@@ -1185,7 +1308,17 @@ body {
 
   .header-actions .btn-primary,
   .header-actions .btn-secondary,
-  .acciones-formulario button {
+  .acciones-formulario button,
+  .solicitantes-container .btn-secondary {
+    width: 100%;
+  }
+
+  .mensaje-acciones {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .mensaje-acciones button {
     width: 100%;
   }
 
