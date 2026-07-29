@@ -7,6 +7,7 @@
 
   const CONFIG = Object.freeze({
     lista: "Backlog",
+    listaHistorial: "HistorialActividad",
     bibliotecaArchivos: "ArchivosRequerimientos",
     tamanoMaximoArchivo: 20 * 1024 * 1024,
     cantidadMaximaArchivos: 10,
@@ -93,6 +94,7 @@
   };
 
   let tipoEntidadLista = null;
+  let tipoEntidadHistorial = null;
   let esquemaLista = null;
   let ultimoDiagnosticoEscritura = null;
 
@@ -161,6 +163,16 @@
 
   function endpointLista() {
     const tituloSeguro = CONFIG.lista.replace(/'/g, "''");
+    return (
+      urlSitio() +
+      "/_api/web/lists/getbytitle('" +
+      tituloSeguro +
+      "')"
+    );
+  }
+
+  function endpointHistorial() {
+    const tituloSeguro = CONFIG.listaHistorial.replace(/'/g, "''");
     return (
       urlSitio() +
       "/_api/web/lists/getbytitle('" +
@@ -553,7 +565,7 @@
     );
     if (!respuesta.ok) {
       throw new Error(
-        "No se encontró ningún usuario de SharePoint con el correo \"" +
+        "No se encontr\u00f3 ning\u00fan usuario de SharePoint con el correo \"" +
         correoNormalizado +
         "\"."
       );
@@ -738,7 +750,7 @@
       datosTipoDocumento.d.TypeAsString !== "MultiChoice"
     ) {
       advertencias.push(
-        "La columna TipoDocumento debe ser de tipo Elección."
+        "La columna TipoDocumento debe ser de tipo Elecci\u00f3n."
       );
     }
 
@@ -1107,7 +1119,7 @@
     if (!respuesta.ok) {
       const detalle = await detalleErrorSharePoint(respuesta);
       throw new Error(
-        "No se pudieron consultar las categorías de documentos (HTTP " +
+        "No se pudieron consultar las categor\u00edas de documentos (HTTP " +
           respuesta.status +
           ")" +
           (detalle ? ": " + detalle : ".")
@@ -1216,7 +1228,7 @@
 // Devuelve:
 // lista de usuarios encontrados.
 //
-// No modifica listas ni información de SharePoint.
+// No modifica listas ni informacion de SharePoint.
 // Solo consulta usuarios.
 // ============================================================
 
@@ -1311,21 +1323,107 @@ async function buscarUsuariosMicrosoft(texto) {
 }
 
 
-  const CLAVE_BITACORA = "backlog_bitacora";
-
-  function obtenerBitacora() {
-    const datos = localStorage.getItem(CLAVE_BITACORA);
-    return datos ? JSON.parse(datos) : [];
+  async function obtenerTipoEntidadHistorial() {
+    if (tipoEntidadHistorial) {
+      return tipoEntidadHistorial;
+    }
+    const respuesta = await solicitar(
+      endpointHistorial() + "/ListItemEntityTypeFullName",
+      {
+        method: "GET",
+        credentials: "same-origin",
+        headers: ODATA
+      }
+    );
+    if (!respuesta.ok) {
+      const detalle = await detalleErrorSharePoint(respuesta);
+      throw new Error(
+        respuesta.status === 404
+          ? "La lista " + CONFIG.listaHistorial + " no existe en SharePoint."
+          : "No se pudo consultar la lista de historial (HTTP " +
+            respuesta.status +
+            ")" +
+            (detalle ? ": " + detalle : ".")
+      );
+    }
+    const datos = await respuesta.json();
+    tipoEntidadHistorial = datos.d.ListItemEntityTypeFullName;
+    return tipoEntidadHistorial;
   }
 
-  function agregarActividad(usuario, accion) {
-    const bitacora = obtenerBitacora();
-    bitacora.unshift({
-      usuario: usuario,
-      accion: accion,
-      fecha: new Date().toLocaleString("es-CO")
+  function desdeActividadSharePoint(item) {
+    return {
+      id: item.Id,
+      usuario: item.Usuario || "",
+      correo: item.Correo || "",
+      accion: item.Accion || item.Title || "",
+      requerimiento: item.Requerimiento || "",
+      tipo: item.TipoActividad || "General",
+      fecha: item.Created || ""
+    };
+  }
+
+  async function obtenerBitacora() {
+    const consulta =
+      "/items?$select=Id,Title,Usuario,Correo,Accion,Requerimiento," +
+      "TipoActividad,Created&$orderby=Created desc&$top=500";
+    const respuesta = await solicitar(endpointHistorial() + consulta, {
+      method: "GET",
+      credentials: "same-origin",
+      headers: ODATA
     });
-    localStorage.setItem(CLAVE_BITACORA, JSON.stringify(bitacora));
+    if (!respuesta.ok) {
+      const detalle = await detalleErrorSharePoint(respuesta);
+      throw new Error(
+        respuesta.status === 404
+          ? "La lista " + CONFIG.listaHistorial + " no existe en SharePoint."
+          : "No se pudo consultar el historial (HTTP " +
+            respuesta.status +
+            ")" +
+            (detalle ? ": " + detalle : ".")
+      );
+    }
+    const datos = await respuesta.json();
+    return datos.d.results.map(desdeActividadSharePoint);
+  }
+
+  async function agregarActividad(usuario, accion, detalles) {
+    const informacion = detalles || {};
+    const usuarioSesion = usuarioActual();
+    const valores = await Promise.all([
+      digest(),
+      obtenerTipoEntidadHistorial()
+    ]);
+    const textoAccion = String(accion || "").trim();
+    const carga = {
+      __metadata: { type: valores[1] },
+      Title: textoAccion.substring(0, 250) || "Actividad de la plataforma",
+      Usuario: String(usuario || usuarioSesion.nombre || "").substring(0, 250),
+      Correo: String(usuarioSesion.correo || "").substring(0, 250),
+      Accion: textoAccion,
+      Requerimiento: String(informacion.requerimiento || "").substring(0, 250),
+      TipoActividad: String(informacion.tipo || "General").substring(0, 250)
+    };
+    const respuesta = await solicitar(endpointHistorial() + "/items", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: Object.assign({}, ODATA, {
+        "Content-Type": "application/json;odata=verbose",
+        "X-RequestDigest": valores[0]
+      }),
+      body: JSON.stringify(carga)
+    });
+    if (!respuesta.ok) {
+      const detalle = await detalleErrorSharePoint(respuesta);
+      throw new Error(
+        "No se pudo registrar la actividad (HTTP " +
+          respuesta.status +
+          ")" +
+          (detalle ? ": " + detalle : ".")
+      );
+    }
+    const datos = await respuesta.json();
+    return desdeActividadSharePoint(datos.d);
   }
 
   global.Modelo = Object.freeze({

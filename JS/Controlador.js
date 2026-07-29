@@ -18,9 +18,12 @@
   let paginaBacklog = 1;
   let requerimientosGestion = [];
   let paginaGestion = 1;
+  let actividadesHistorial = [];
+  let paginaHistorial = 1;
   let dialogoMensajeActual = null;
   let focoAntesDelDialogo = null;
   const REQUERIMIENTOS_POR_PAGINA = 5;
+  const ACTIVIDADES_POR_PAGINA = 10;
   const TIPOS_DOCUMENTO_PREDETERMINADOS = [
     "01_Historia_Usuario",
     "02_Fuentes",
@@ -285,6 +288,26 @@
     }
   }
 
+  async function registrarActividadCompartida(accion, detalles) {
+    try {
+      await Modelo.agregarActividad(
+        Modelo.usuarioActual().nombre,
+        accion,
+        detalles
+      );
+    } catch (error) {
+      global.BitacoraDiagnosticoHistorial = {
+        accion: accion,
+        error: error.message,
+        fecha: new Date().toISOString()
+      };
+      console.warn(
+        "La operaci\u00f3n se complet\u00f3, pero no se pudo registrar en el historial:",
+        error
+      );
+    }
+  }
+
   async function comprobarConexion() {
     try {
       const diagnostico = await Modelo.verificarConexion();
@@ -494,10 +517,10 @@
       icon: "info",
       title: "Exportar CSV",
       text:
-        "Se descargará un archivo CSV con " +
+        "Se descargar\u00e1 un archivo CSV con " +
         datos.length +
         (datos.length === 1 ? " requerimiento" : " requerimientos") +
-        " según los filtros actuales.",
+        " seg\u00fan los filtros actuales.",
       showCancelButton: true,
       confirmButtonText: "Descargar",
       cancelButtonText: "Cancelar"
@@ -848,8 +871,8 @@
     resumen.textContent = cantidad
       ? cantidad +
         (cantidad === 1
-          ? " archivo seleccionado. Puedes elegir más archivos."
-          : " archivos seleccionados. Puedes elegir más archivos.")
+          ? " archivo seleccionado. Puedes elegir m\u00e1s archivos."
+          : " archivos seleccionados. Puedes elegir m\u00e1s archivos.")
       : "No hay archivos agregados.";
   }
 
@@ -946,9 +969,9 @@
         icon: "warning",
         title: "Demasiados archivos",
         text:
-          "Puede adjuntar máximo " +
+          "Puede adjuntar m\u00e1ximo " +
           Modelo.configuracion.cantidadMaximaArchivos +
-          " archivos por operación."
+          " archivos por operaci\u00f3n."
       });
       return;
     }
@@ -1150,14 +1173,17 @@
             "."
         });
       } else {
-        Modelo.agregarActividad(
-          Modelo.usuarioActual().nombre,
+        await registrarActividadCompartida(
           "Agreg\u00f3 " +
             resultado.cargados.length +
             (resultado.cargados.length === 1
               ? " archivo al requerimiento "
               : " archivos al requerimiento ") +
-            requerimientoDetalleActual.id
+            requerimientoDetalleActual.id,
+          {
+            tipo: "Archivos",
+            requerimiento: requerimientoDetalleActual.id
+          }
         );
         await mostrarAlerta({
           icon: "success",
@@ -1204,9 +1230,9 @@
       archivosClasificados.length > configuracion.cantidadMaximaArchivos
     ) {
       throw new Error(
-        "Puede adjuntar máximo " +
+        "Puede adjuntar m\u00e1ximo " +
           configuracion.cantidadMaximaArchivos +
-          " archivos por operación."
+          " archivos por operaci\u00f3n."
       );
     }
 
@@ -1232,14 +1258,14 @@
         throw new Error(
           "El archivo " +
             archivo.name +
-            " tiene una extensión no permitida."
+            " tiene una extensi\u00f3n no permitida."
         );
       }
       if (archivo.size > configuracion.tamanoMaximoArchivo) {
         throw new Error(
           "El archivo " +
             archivo.name +
-            " supera el tamaño máximo de 20 MB."
+            " supera el tama\u00f1o m\u00e1ximo de 20 MB."
         );
       }
       if (/[#%]/.test(archivo.name)) {
@@ -1276,7 +1302,7 @@
       fecha: new Date().toISOString()
     };
     console.error(
-      "Diagnóstico de carga de archivos:",
+      "Diagn\u00f3stico de carga de archivos:",
       global.BitacoraDiagnosticoArchivos
     );
     await mostrarAlerta({
@@ -1399,7 +1425,7 @@ function renderizarUsuariosSeleccionados() {
 
                 '<button type="button" data-index="' +
                 index +
-                '">×</button>' +
+                '">&times;</button>' +
 
                 '</div>'
 
@@ -1546,9 +1572,12 @@ async function buscarUsuarios() {
           requerimientoActualizado,
           archivosClasificados
         );
-        Modelo.agregarActividad(
-          Modelo.usuarioActual().nombre,
-          "Edit\u00f3 el requerimiento " + requerimientoEnEdicion.id
+        await registrarActividadCompartida(
+          "Edit\u00f3 el requerimiento " + requerimientoEnEdicion.id,
+          {
+            tipo: "Edici\u00f3n",
+            requerimiento: requerimientoEnEdicion.id
+          }
         );
         requerimientoEnEdicion = null;
         if (
@@ -1574,9 +1603,12 @@ async function buscarUsuarios() {
           requerimientoCreado,
           archivosClasificados
         );
-        Modelo.agregarActividad(
-          Modelo.usuarioActual().nombre,
-          "Cre\u00f3 el requerimiento " + datos.id + " - " + datos.asunto
+        await registrarActividadCompartida(
+          "Cre\u00f3 el requerimiento " + datos.id + " - " + datos.asunto,
+          {
+            tipo: "Creaci\u00f3n",
+            requerimiento: datos.id
+          }
         );
         if (
           await mostrarErroresCarga(resultadoArchivos, requerimientoCreado.id)
@@ -1719,6 +1751,136 @@ async function buscarUsuarios() {
     }
   }
 
+  function actualizarTiposHistorial() {
+    const select = document.getElementById("filtro-tipo-historial");
+    const valorActual = select.value;
+    const tipos = actividadesHistorial
+      .map(function (actividad) {
+        return actividad.tipo;
+      })
+      .filter(Boolean)
+      .filter(function (tipo, indice, arreglo) {
+        return arreglo.indexOf(tipo) === indice;
+      })
+      .sort();
+    select.innerHTML =
+      '<option value="">Todos los tipos</option>' +
+      tipos
+        .map(function (tipo) {
+          const seguro = String(tipo)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+          return '<option value="' + seguro + '">' + seguro + "</option>";
+        })
+        .join("");
+    if (tipos.indexOf(valorActual) !== -1) {
+      select.value = valorActual;
+    }
+  }
+
+  function filtrarHistorial() {
+    const texto = document
+      .getElementById("buscador-historial")
+      .value.trim()
+      .toLowerCase();
+    const tipo = document.getElementById("filtro-tipo-historial").value;
+    const fecha = document.getElementById("filtro-fecha-historial").value;
+    return actividadesHistorial.filter(function (actividad) {
+      const contenido = [
+        actividad.usuario,
+        actividad.correo,
+        actividad.accion,
+        actividad.requerimiento,
+        actividad.tipo
+      ]
+        .join(" ")
+        .toLowerCase();
+      return (
+        contenido.indexOf(texto) !== -1 &&
+        (!tipo || actividad.tipo === tipo) &&
+        coincideFecha(actividad.fecha, fecha)
+      );
+    });
+  }
+
+  function renderizarPaginaHistorial() {
+    const filtradas = filtrarHistorial();
+    const total = filtradas.length;
+    const totalPaginas = Math.max(
+      1,
+      Math.ceil(total / ACTIVIDADES_POR_PAGINA)
+    );
+    paginaHistorial = Math.min(Math.max(1, paginaHistorial), totalPaginas);
+    const inicio = (paginaHistorial - 1) * ACTIVIDADES_POR_PAGINA;
+    Vista.renderizarActividad(
+      filtradas.slice(inicio, inicio + ACTIVIDADES_POR_PAGINA),
+      {
+        pagina: paginaHistorial,
+        totalPaginas: totalPaginas,
+        total: total,
+        inicio: total ? inicio + 1 : 0,
+        fin: Math.min(inicio + ACTIVIDADES_POR_PAGINA, total)
+      }
+    );
+  }
+
+  async function cargarHistorial() {
+    const estado = document.getElementById("estado-historial");
+    estado.textContent = "Consultando la actividad compartida en SharePoint\u2026";
+    try {
+      actividadesHistorial = await Modelo.obtenerBitacora();
+      paginaHistorial = 1;
+      actualizarTiposHistorial();
+      renderizarPaginaHistorial();
+      estado.textContent =
+        actividadesHistorial.length +
+        (actividadesHistorial.length === 1
+          ? " actividad encontrada."
+          : " actividades encontradas.");
+    } catch (error) {
+      actividadesHistorial = [];
+      paginaHistorial = 1;
+      actualizarTiposHistorial();
+      renderizarPaginaHistorial();
+      estado.textContent =
+        error.message +
+        " Revisa la configuraci\u00f3n indicada para la lista HistorialActividad.";
+      console.error("Carga del historial:", error);
+    }
+  }
+
+  function aplicarFiltrosHistorial() {
+    paginaHistorial = 1;
+    renderizarPaginaHistorial();
+  }
+
+  function limpiarFiltrosHistorial() {
+    document.getElementById("buscador-historial").value = "";
+    document.getElementById("filtro-tipo-historial").value = "";
+    document.getElementById("filtro-fecha-historial").value = "";
+    aplicarFiltrosHistorial();
+  }
+
+  function cambiarPaginaHistorial(pagina) {
+    const destino = Number(pagina);
+    const totalPaginas = Math.max(
+      1,
+      Math.ceil(filtrarHistorial().length / ACTIVIDADES_POR_PAGINA)
+    );
+    if (
+      !Number.isInteger(destino) ||
+      destino < 1 ||
+      destino > totalPaginas ||
+      destino === paginaHistorial
+    ) {
+      return;
+    }
+    paginaHistorial = destino;
+    renderizarPaginaHistorial();
+  }
+
   async function cargarGestion() {
     try {
       Vista.renderizarGestion(await Modelo.obtenerTodos());
@@ -1859,9 +2021,12 @@ async function buscarUsuarios() {
 
     try {
       await Modelo.actualizar(id, cambios);
-      Modelo.agregarActividad(
-        Modelo.usuarioActual().nombre,
-        "Actualiz\u00f3 el requerimiento " + id
+      await registrarActividadCompartida(
+        "Actualiz\u00f3 el requerimiento " + id,
+        {
+          tipo: "Gesti\u00f3n",
+          requerimiento: id
+        }
       );
       await mostrarAlerta({
         icon: "success",
@@ -1935,6 +2100,8 @@ if (btnAgregarPersona) {
           Vista.mostrarMisRequerimientos();
         } else if (vista === "gestion") {
           Vista.mostrarGestion();
+        } else if (vista === "historial") {
+          Vista.mostrarHistorial();
         } else if (vista === "crear") {
           Vista.mostrarFormularioCrear();
         }
@@ -2037,6 +2204,30 @@ document
         const boton = evento.target.closest("button[data-pagina]");
         if (boton && !boton.disabled) {
           cambiarPaginaGestion(boton.dataset.pagina);
+        }
+      });
+
+    document
+      .getElementById("buscador-historial")
+      .addEventListener("input", aplicarFiltrosHistorial);
+    document
+      .getElementById("filtro-tipo-historial")
+      .addEventListener("change", aplicarFiltrosHistorial);
+    document
+      .getElementById("filtro-fecha-historial")
+      .addEventListener("change", aplicarFiltrosHistorial);
+    document
+      .getElementById("btn-limpiar-historial")
+      .addEventListener("click", limpiarFiltrosHistorial);
+    document
+      .getElementById("btn-actualizar-historial")
+      .addEventListener("click", cargarHistorial);
+    document
+      .getElementById("controles-paginacion-historial")
+      .addEventListener("click", function (evento) {
+        const boton = evento.target.closest("button[data-pagina]");
+        if (boton && !boton.disabled) {
+          cambiarPaginaHistorial(boton.dataset.pagina);
         }
       });
 
@@ -2180,7 +2371,7 @@ if (resultadosUsuarios) {
             renderizarUsuariosSeleccionados();
 
 
-            // Limpia búsqueda
+            // Limpia busqueda
             inputBuscarUsuario.value = "";
 
 
@@ -2203,7 +2394,9 @@ if (resultadosUsuarios) {
     cambiarPaginaMisRequerimientos: cambiarPaginaMisRequerimientos,
     cambiarPaginaBacklog: cambiarPaginaBacklog,
     cargarGestion: cargarGestion,
-    cambiarPaginaGestion: cambiarPaginaGestion
+    cambiarPaginaGestion: cambiarPaginaGestion,
+    cargarHistorial: cargarHistorial,
+    cambiarPaginaHistorial: cambiarPaginaHistorial
   });
 
   global.cargarDatosDashboard = cargarDashboard;

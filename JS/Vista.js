@@ -9,7 +9,8 @@
     dashboard: "view-dashboard",
     crear: "view-crear-requerimiento",
     mis: "view-mis-requerimientos",
-    gestion: "view-gestion"
+    gestion: "view-gestion",
+    historial: "view-historial"
   };
   const ICONO_OJO =
     '<svg viewBox="0 0 24 24" aria-hidden="true">' +
@@ -97,6 +98,11 @@
     global.Controlador.cargarGestion();
   }
 
+  function mostrarHistorial() {
+    mostrarVista("historial");
+    global.Controlador.cargarHistorial();
+  }
+
   function mostrarConexion(estado, detalle) {
     const indicador = document.getElementById("estado-conexion");
     if (!indicador) {
@@ -176,7 +182,7 @@ function renderizarTabla(datos, paginacion) {
             );
           })
           .join("")
-      : '<tr class="empty-row"><td colspan="11">No hay requerimientos que coincidan con la búsqueda.</td></tr>';
+      : '<tr class="empty-row"><td colspan="11">No hay requerimientos que coincidan con la b\u00fasqueda.</td></tr>';
     if (paginacion) {
       renderizarPaginacionBacklog(paginacion);
     }
@@ -198,7 +204,7 @@ function renderizarTabla(datos, paginacion) {
     resumen.textContent =
       "Mostrando " +
       paginacion.inicio +
-      "–" +
+      "&ndash;" +
       paginacion.fin +
       " de " +
       paginacion.total;
@@ -206,7 +212,7 @@ function renderizarTabla(datos, paginacion) {
     const anterior =
       '<button type="button" data-pagina="' +
       (paginacion.pagina - 1) +
-      '" aria-label="Página anterior"' +
+      '" aria-label="P\u00e1gina anterior"' +
       (paginacion.pagina === 1 ? " disabled" : "") +
       ">&#8249;</button>";
     const paginas = paginasPaginacion(
@@ -215,13 +221,13 @@ function renderizarTabla(datos, paginacion) {
     )
       .map(function (pagina) {
         if (pagina === "...") {
-          return '<span class="pagination-ellipsis" aria-hidden="true">…</span>';
+          return '<span class="pagination-ellipsis" aria-hidden="true">&hellip;</span>';
         }
         const activa = pagina === paginacion.pagina;
         return (
           '<button type="button" data-pagina="' +
           pagina +
-          '" aria-label="Ir a la página ' +
+          '" aria-label="Ir a la p\u00e1gina ' +
           pagina +
           '"' +
           (activa ? ' class="active" aria-current="page"' : "") +
@@ -234,7 +240,7 @@ function renderizarTabla(datos, paginacion) {
     const siguiente =
       '<button type="button" data-pagina="' +
       (paginacion.pagina + 1) +
-      '" aria-label="Página siguiente"' +
+      '" aria-label="P\u00e1gina siguiente"' +
       (paginacion.pagina === paginacion.totalPaginas ? " disabled" : "") +
       ">&#8250;</button>";
     controles.innerHTML = anterior + paginas + siguiente;
@@ -428,7 +434,7 @@ function renderizarGestion(datos, paginacion) {
     resumen.textContent =
       "Mostrando " +
       paginacion.inicio +
-      "–" +
+      "&ndash;" +
       paginacion.fin +
       " de " +
       paginacion.total;
@@ -436,7 +442,7 @@ function renderizarGestion(datos, paginacion) {
     const anterior =
       '<button type="button" data-pagina="' +
       (paginacion.pagina - 1) +
-      '" aria-label="Página anterior"' +
+      '" aria-label="P\u00e1gina anterior"' +
       (paginacion.pagina === 1 ? " disabled" : "") +
       ">&#8249;</button>";
     const paginas = paginasPaginacion(
@@ -445,13 +451,13 @@ function renderizarGestion(datos, paginacion) {
     )
       .map(function (pagina) {
         if (pagina === "...") {
-          return '<span class="pagination-ellipsis" aria-hidden="true">…</span>';
+          return '<span class="pagination-ellipsis" aria-hidden="true">&hellip;</span>';
         }
         const activa = pagina === paginacion.pagina;
         return (
           '<button type="button" data-pagina="' +
           pagina +
-          '" aria-label="Ir a la página ' +
+          '" aria-label="Ir a la p\u00e1gina ' +
           pagina +
           '"' +
           (activa ? ' class="active" aria-current="page"' : "") +
@@ -464,7 +470,7 @@ function renderizarGestion(datos, paginacion) {
     const siguiente =
       '<button type="button" data-pagina="' +
       (paginacion.pagina + 1) +
-      '" aria-label="Página siguiente"' +
+      '" aria-label="P\u00e1gina siguiente"' +
       (paginacion.pagina === paginacion.totalPaginas ? " disabled" : "") +
       ">&#8250;</button>";
     controles.innerHTML = anterior + paginas + siguiente;
@@ -560,18 +566,115 @@ function renderizarGestion(datos, paginacion) {
     });
   }
 
-  function renderizarActividad(actividades) {
+  function formatearFechaHora(valor) {
+    if (!valor) {
+      return "Fecha no disponible";
+    }
+    const fecha = new Date(valor);
+    if (isNaN(fecha.getTime())) {
+      return String(valor);
+    }
+    return fecha.toLocaleString("es-CO", {
+      dateStyle: "medium",
+      timeStyle: "short"
+    });
+  }
+
+  function renderizarActividad(actividades, paginacion) {
     const lista = document.getElementById("lista-actividad");
-    lista.innerHTML = actividades
-      .map(function (item) {
+    lista.innerHTML = actividades.length
+      ? actividades
+          .map(function (item) {
+            const inicial = String(item.usuario || "U")
+              .trim()
+              .charAt(0)
+              .toUpperCase();
+            const referencia = item.requerimiento
+              ? '<span class="activity-reference">Req. ' +
+                textoSeguro(item.requerimiento) +
+                "</span>"
+              : "";
+            return (
+              '<article class="activity-item">' +
+              '<div class="dot" aria-hidden="true">' +
+              textoSeguro(inicial) +
+              "</div>" +
+              '<div class="txt"><div class="activity-heading">' +
+              "<strong>" +
+              textoSeguro(item.usuario || "Usuario de SharePoint") +
+              "</strong>" +
+              '<span class="activity-type">' +
+              textoSeguro(item.tipo || "General") +
+              "</span></div>" +
+              '<p class="activity-action">' +
+              textoSeguro(item.accion) +
+              "</p>" +
+              '<div class="meta">' +
+              textoSeguro(formatearFechaHora(item.fecha)) +
+              (item.correo
+                ? " &middot; " + textoSeguro(item.correo)
+                : "") +
+              referencia +
+              "</div></div></article>"
+            );
+          })
+          .join("")
+      : '<p class="empty-message">No hay actividad que coincida con los filtros.</p>';
+    renderizarPaginacionHistorial(paginacion);
+  }
+
+  function renderizarPaginacionHistorial(paginacion) {
+    const pie = document.getElementById("pie-paginacion-historial");
+    const resumen = document.getElementById("resumen-paginacion-historial");
+    const controles = document.getElementById(
+      "controles-paginacion-historial"
+    );
+    const tieneDatos = paginacion && paginacion.total > 0;
+    pie.hidden = !tieneDatos;
+    if (!tieneDatos) {
+      resumen.textContent = "";
+      controles.innerHTML = "";
+      return;
+    }
+    resumen.textContent =
+      "Mostrando " +
+      paginacion.inicio +
+      "\u2013" +
+      paginacion.fin +
+      " de " +
+      paginacion.total;
+    const botones = paginasPaginacion(
+      paginacion.pagina,
+      paginacion.totalPaginas
+    )
+      .map(function (pagina) {
+        if (pagina === "...") {
+          return '<span class="pagination-ellipsis" aria-hidden="true">\u2026</span>';
+        }
+        const activa = pagina === paginacion.pagina;
         return (
-          '<div class="activity-item"><div class="dot">\u2022</div><div class="txt">' +
-          "<strong>" + textoSeguro(item.usuario) + "</strong><br>" +
-          textoSeguro(item.accion) +
-          '<div class="meta">' + textoSeguro(item.fecha) + "</div></div></div>"
+          '<button type="button" data-pagina="' +
+          pagina +
+          '"' +
+          (activa ? ' class="active" aria-current="page"' : "") +
+          ">" +
+          pagina +
+          "</button>"
         );
       })
       .join("");
+    controles.innerHTML =
+      '<button type="button" data-pagina="' +
+      (paginacion.pagina - 1) +
+      '" aria-label="P\u00e1gina anterior"' +
+      (paginacion.pagina === 1 ? " disabled" : "") +
+      ">&#8249;</button>" +
+      botones +
+      '<button type="button" data-pagina="' +
+      (paginacion.pagina + 1) +
+      '" aria-label="P\u00e1gina siguiente"' +
+      (paginacion.pagina === paginacion.totalPaginas ? " disabled" : "") +
+      ">&#8250;</button>";
   }
 
   function fechaArchivo(valor) {
@@ -663,7 +766,7 @@ function renderizarGestion(datos, paginacion) {
             urlVistaPrevia +
             '" target="_blank" rel="noopener noreferrer" title="Visualizar" aria-label="Visualizar ' +
             textoSeguro(nombre) +
-            ' en otra pestaña">' +
+            ' en otra pesta\u00f1a">' +
             ICONO_OJO +
             "</a>"
           : '<span class="sp-file-action is-disabled" title="Vista previa no disponible para este formato" aria-label="Vista previa no disponible para ' +
@@ -874,6 +977,7 @@ function renderizarGestion(datos, paginacion) {
     mostrarFormularioEdicion: mostrarFormularioEdicion,
     mostrarMisRequerimientos: mostrarMisRequerimientos,
     mostrarGestion: mostrarGestion,
+    mostrarHistorial: mostrarHistorial,
     mostrarConexion: mostrarConexion,
     mostrarUsuario: mostrarUsuario,
     formatearFecha: formatearFecha,

@@ -6,7 +6,7 @@
   <meta name="description" content="Bit&#225;cora de requerimientos de Apps Colombia integrada con SharePoint Online.">
   <title>Bit&#225;cora | Backlog Apps Colombia</title>
   <link rel="stylesheet"
-    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260729.22" />
+    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260729.23" />
 </head>
 <body>
   <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
@@ -43,7 +43,7 @@
           <button class="nav-sub" type="button" data-vista="gestion">Cambiar estados</button>
         </div>
 
-        <button class="nav-item" type="button">
+        <button class="nav-item" type="button" data-vista="historial">
           <span class="ico" aria-hidden="true">&#x25F4;</span>
           <span>Historial</span>
         </button>
@@ -337,7 +337,7 @@
                     </div>
 
 
-                    <!-- Campo oculto que seguirá enviándose a SharePoint -->
+                    <!-- Campo oculto que seguira enviandose a SharePoint -->
                     <textarea 
                         id="solicitadoPor"
                         hidden>
@@ -444,6 +444,55 @@
         </section>
       </section>
 
+      <section id="view-historial" aria-labelledby="titulo-historial" hidden>
+        <header class="top-row">
+          <div>
+            <p class="eyebrow">TRAZABILIDAD COMPARTIDA</p>
+            <h1 id="titulo-historial">Actividad reciente</h1>
+            <p class="subtitle">Acciones realizadas por los usuarios de la plataforma y almacenadas en SharePoint.</p>
+          </div>
+          <button class="btn-secondary" id="btn-actualizar-historial" type="button">
+            Actualizar
+          </button>
+        </header>
+
+        <section class="panel" aria-labelledby="titulo-lista-actividad">
+          <div class="panel-heading">
+            <div>
+              <h2 id="titulo-lista-actividad">Historial de actividad</h2>
+              <p id="estado-historial" role="status">Consulta las acciones m&#225;s recientes de todos los usuarios.</p>
+            </div>
+          </div>
+
+          <div class="filters" aria-label="Filtros del historial">
+            <label class="search" for="buscador-historial">
+              <span aria-hidden="true">&#x2315;</span>
+              <input type="search" id="buscador-historial"
+                placeholder="Buscar por usuario, acci&#243;n o requerimiento">
+            </label>
+            <select class="fake-select" id="filtro-tipo-historial"
+              aria-label="Filtrar historial por tipo de actividad">
+              <option value="">Todos los tipos</option>
+            </select>
+            <input type="date" class="fake-select" id="filtro-fecha-historial"
+              aria-label="Filtrar historial por fecha" title="Filtrar historial por fecha">
+            <button class="btn-link danger-link" id="btn-limpiar-historial" type="button">
+              &#215; Limpiar filtros
+            </button>
+          </div>
+
+          <div class="activity-list" id="lista-actividad" aria-live="polite">
+            <p class="empty-message">Selecciona Historial para consultar la actividad compartida.</p>
+          </div>
+
+          <footer class="table-footer" id="pie-paginacion-historial" hidden>
+            <span id="resumen-paginacion-historial"></span>
+            <nav class="pagination" id="controles-paginacion-historial"
+              aria-label="Paginaci&#243;n del historial"></nav>
+          </footer>
+        </section>
+      </section>
+
       <section id="view-gestion" class="admin-only" aria-labelledby="titulo-gestion" hidden>
         <header class="top-row">
           <div>
@@ -531,12 +580,9 @@
     </div>
   </div>
 
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260729.10"></script>
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260729.10"></script>
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260729.18"></script>
+  <script charset="utf-8" src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260729.24"></script>
+  <script charset="utf-8" src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260729.24"></script>
+  <script charset="utf-8" src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260729.24"></script>
 </body>
 </html>
-
-
-
 
