@@ -11,8 +11,11 @@
   let observadorChromeSharePoint = null;
   let documentoObservadoSharePoint = null;
   let requerimientoEnEdicion = null;
+  let requerimientosPropios = [];
+  let paginaMisRequerimientos = 1;
   let dialogoMensajeActual = null;
   let focoAntesDelDialogo = null;
+  const REQUERIMIENTOS_POR_PAGINA = 5;
 
   const SELECTORES_CHROME_SHAREPOINT = [
     "#suiteBar",
@@ -27,6 +30,10 @@
   ];
 
   const SELECTORES_ANCHO_SHAREPOINT = [
+    "#s4-bodyContainer",
+    "#contentRow",
+    "#contentBox",
+    "#DeltaPlaceHolderMain",
     ".ms-webpart-zone",
     ".ms-webpart-cell-vertical",
     ".ms-webpart-chrome-vertical",
@@ -137,13 +144,21 @@
         .forEach(function (elemento) {
           elemento.style.setProperty("width", "100%", "important");
           elemento.style.setProperty("max-width", "none", "important");
+          elemento.style.setProperty("margin", "0", "important");
+          elemento.style.setProperty("padding", "0", "important");
         });
     });
 
     const workspace =
       documentoSharePoint.getElementById("s4-workspace");
     if (workspace) {
-      workspace.style.setProperty("overflow", "auto", "important");
+      workspace.style.setProperty("inset", "0", "important");
+      workspace.style.setProperty("width", "100%", "important");
+      workspace.style.setProperty("height", "100%", "important");
+      workspace.style.setProperty("margin", "0", "important");
+      workspace.style.setProperty("padding", "0", "important");
+      workspace.style.setProperty("overflow-x", "hidden", "important");
+      workspace.style.setProperty("overflow-y", "auto", "important");
     }
 
     return true;
@@ -706,16 +721,66 @@
     }
   }
 
+  function renderizarPaginaMisRequerimientos() {
+    const total = requerimientosPropios.length;
+    const totalPaginas = Math.max(
+      1,
+      Math.ceil(total / REQUERIMIENTOS_POR_PAGINA)
+    );
+    paginaMisRequerimientos = Math.min(
+      Math.max(1, paginaMisRequerimientos),
+      totalPaginas
+    );
+    const indiceInicial =
+      (paginaMisRequerimientos - 1) * REQUERIMIENTOS_POR_PAGINA;
+    const datosPagina = requerimientosPropios.slice(
+      indiceInicial,
+      indiceInicial + REQUERIMIENTOS_POR_PAGINA
+    );
+
+    Vista.renderizarMisRequerimientos(datosPagina, {
+      pagina: paginaMisRequerimientos,
+      totalPaginas: totalPaginas,
+      total: total,
+      inicio: total ? indiceInicial + 1 : 0,
+      fin: Math.min(indiceInicial + REQUERIMIENTOS_POR_PAGINA, total)
+    });
+  }
+
+  function cambiarPaginaMisRequerimientos(pagina) {
+    const destino = Number(pagina);
+    const totalPaginas = Math.max(
+      1,
+      Math.ceil(requerimientosPropios.length / REQUERIMIENTOS_POR_PAGINA)
+    );
+    if (
+      !Number.isInteger(destino) ||
+      destino < 1 ||
+      destino > totalPaginas ||
+      destino === paginaMisRequerimientos
+    ) {
+      return;
+    }
+    paginaMisRequerimientos = destino;
+    renderizarPaginaMisRequerimientos();
+    document
+      .getElementById("titulo-mis-requerimientos")
+      .scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   async function cargarMisRequerimientos() {
     try {
       const datos = await Modelo.obtenerTodos();
-      const propios = datos.filter(function (req) {
+      requerimientosPropios = datos.filter(function (req) {
         return esRequerimientoPropio(req);
       });
-      Vista.renderizarMisRequerimientos(propios);
+      paginaMisRequerimientos = 1;
+      renderizarPaginaMisRequerimientos();
     } catch (error) {
       console.error("Carga de requerimientos personales:", error);
-      Vista.renderizarMisRequerimientos([]);
+      requerimientosPropios = [];
+      paginaMisRequerimientos = 1;
+      renderizarPaginaMisRequerimientos();
     }
   }
 
@@ -839,6 +904,15 @@
       });
 
     document
+      .getElementById("controles-paginacion-mis")
+      .addEventListener("click", function (evento) {
+        const boton = evento.target.closest("button[data-pagina]");
+        if (boton && !boton.disabled) {
+          cambiarPaginaMisRequerimientos(boton.dataset.pagina);
+        }
+      });
+
+    document
       .getElementById("tabla-gestion")
       .addEventListener("click", function (evento) {
         const boton = evento.target.closest(".save-btn");
@@ -901,6 +975,7 @@
     cargarDashboard: cargarDashboard,
     prepararFormulario: prepararFormulario,
     cargarMisRequerimientos: cargarMisRequerimientos,
+    cambiarPaginaMisRequerimientos: cambiarPaginaMisRequerimientos,
     cargarGestion: cargarGestion
   });
 

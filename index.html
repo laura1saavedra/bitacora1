@@ -6,7 +6,7 @@
   <meta name="description" content="Bit&#225;cora de requerimientos de Apps Colombia integrada con SharePoint Online.">
   <title>Bit&#225;cora | Backlog Apps Colombia</title>
   <link rel="stylesheet"
-    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260728.3" />
+    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260728.9" />
 </head>
 <body>
   <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
@@ -371,7 +371,7 @@
         </header>
         <section class="panel">
           <div class="table-scroll">
-            <table>
+            <table class="my-requests-table">
               <thead>
                 <tr>
                   <th scope="col">ID REQ.</th>
@@ -382,7 +382,7 @@
                   <th scope="col">Solicitado por</th>
                   <th scope="col">Responsable</th>
                   <th scope="col">Estado</th>
-                  <th scope="col">Acciones</th>
+                  <th class="request-actions-header" scope="col">Acciones</th>
                 </tr>
               </thead>
               <tbody id="tabla-mis-requerimientos">
@@ -392,6 +392,12 @@
               </tbody>
             </table>
           </div>
+          <footer class="table-footer my-requests-pagination"
+            id="paginacion-mis-requerimientos" hidden>
+            <span id="resumen-paginacion-mis"></span>
+            <nav class="pagination" id="controles-paginacion-mis"
+              aria-label="Paginaci&#243;n de mis requerimientos"></nav>
+          </footer>
         </section>
       </section>
 
@@ -469,7 +475,7 @@
   </div>
 
   <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260728.2"></script>
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260728.2"></script>
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260728.4"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260728.4"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260728.6"></script>
 </body>
 </html>

@@ -11,6 +11,14 @@
     mis: "view-mis-requerimientos",
     gestion: "view-gestion"
   };
+  const ICONO_OJO =
+    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>' +
+    '<circle cx="12" cy="12" r="2.5"></circle></svg>';
+  const ICONO_LAPIZ =
+    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path d="m4 20 4.3-1.1L19 8.2 15.8 5 5.1 15.7 4 20Z"></path>' +
+    '<path d="m14.5 6.3 3.2 3.2"></path></svg>';
 
   function textoSeguro(valor) {
     return String(valor == null ? "" : valor)
@@ -110,17 +118,17 @@
       .map(function (req) {
         return (
           "<tr>" +
-          '<td class="req-id">' + textoSeguro(req.id) + "</td>" +
-          "<td>" + textoSeguro(req.app) + "</td>" +
-          "<td>" + textoSeguro(req.tipoServicio) + "</td>" +
-          "<td>" + textoSeguro(req.asunto) + "</td>" +
-          "<td>" + textoSeguro(req.solicitadoPor) + "</td>" +
-          "<td>" + textoSeguro(req.responsable || "No asignado") + "</td>" +
-          "<td>" + textoSeguro(req.prioridad) + "</td>" +
-          "<td>" + textoSeguro(req.estado) + "</td>" +
-          "<td>" + textoSeguro(req.fechaSolicitud) + "</td>" +
-          "<td>" + textoSeguro(req.fechaCierre || "Sin definir") + "</td>" +
-          "<td>" +
+          '<td class="req-id" data-label="ID req.">' + textoSeguro(req.id) + "</td>" +
+          '<td data-label="APP">' + textoSeguro(req.app) + "</td>" +
+          '<td data-label="Tipo de servicio">' + textoSeguro(req.tipoServicio) + "</td>" +
+          '<td data-label="Asunto">' + textoSeguro(req.asunto) + "</td>" +
+          '<td data-label="Solicitado por">' + textoSeguro(req.solicitadoPor) + "</td>" +
+          '<td data-label="Responsable">' + textoSeguro(req.responsable || "No asignado") + "</td>" +
+          '<td data-label="Prioridad">' + textoSeguro(req.prioridad) + "</td>" +
+          '<td data-label="Estado">' + textoSeguro(req.estado) + "</td>" +
+          '<td data-label="F. solicitud">' + textoSeguro(req.fechaSolicitud) + "</td>" +
+          '<td data-label="F. cierre">' + textoSeguro(req.fechaCierre || "Sin definir") + "</td>" +
+          '<td data-label="Acciones">' +
           '<button class="action-btn view-btn" data-id="' +
           textoSeguro(req.id) +
           '">Ver</button>' +
@@ -130,38 +138,121 @@
       .join("");
   }
 
-  function renderizarMisRequerimientos(datos) {
+  function paginasPaginacion(paginaActual, totalPaginas) {
+    if (totalPaginas <= 7) {
+      return Array.from({ length: totalPaginas }, function (_, indice) {
+        return indice + 1;
+      });
+    }
+
+    const paginas = [1];
+    const inicio = Math.max(2, paginaActual - 1);
+    const fin = Math.min(totalPaginas - 1, paginaActual + 1);
+    if (inicio > 2) {
+      paginas.push("...");
+    }
+    for (let pagina = inicio; pagina <= fin; pagina += 1) {
+      paginas.push(pagina);
+    }
+    if (fin < totalPaginas - 1) {
+      paginas.push("...");
+    }
+    paginas.push(totalPaginas);
+    return paginas;
+  }
+
+  function renderizarPaginacionMisRequerimientos(paginacion) {
+    const pie = document.getElementById("paginacion-mis-requerimientos");
+    const resumen = document.getElementById("resumen-paginacion-mis");
+    const controles = document.getElementById("controles-paginacion-mis");
+    const tieneDatos = paginacion && paginacion.total > 0;
+    pie.hidden = !tieneDatos;
+
+    if (!tieneDatos) {
+      resumen.textContent = "";
+      controles.innerHTML = "";
+      return;
+    }
+
+    resumen.textContent =
+      "Mostrando " +
+      paginacion.inicio +
+      "\u2013" +
+      paginacion.fin +
+      " de " +
+      paginacion.total;
+
+    const anterior =
+      '<button type="button" data-pagina="' +
+      (paginacion.pagina - 1) +
+      '" aria-label="P\u00e1gina anterior"' +
+      (paginacion.pagina === 1 ? " disabled" : "") +
+      ">&#8249;</button>";
+    const paginas = paginasPaginacion(
+      paginacion.pagina,
+      paginacion.totalPaginas
+    )
+      .map(function (pagina) {
+        if (pagina === "...") {
+          return '<span class="pagination-ellipsis" aria-hidden="true">\u2026</span>';
+        }
+        const activa = pagina === paginacion.pagina;
+        return (
+          '<button type="button" data-pagina="' +
+          pagina +
+          '" aria-label="Ir a la p\u00e1gina ' +
+          pagina +
+          '"' +
+          (activa ? ' class="active" aria-current="page"' : "") +
+          ">" +
+          pagina +
+          "</button>"
+        );
+      })
+      .join("");
+    const siguiente =
+      '<button type="button" data-pagina="' +
+      (paginacion.pagina + 1) +
+      '" aria-label="P\u00e1gina siguiente"' +
+      (paginacion.pagina === paginacion.totalPaginas ? " disabled" : "") +
+      ">&#8250;</button>";
+    controles.innerHTML = anterior + paginas + siguiente;
+  }
+
+  function renderizarMisRequerimientos(datos, paginacion) {
     const cuerpo = document.getElementById("tabla-mis-requerimientos");
     cuerpo.innerHTML = datos.length
       ? datos
           .map(function (req) {
             return (
-              "<tr><td>" + textoSeguro(req.id) + "</td>" +
-              "<td>" + textoSeguro(req.app) + "</td>" +
-              "<td>" + textoSeguro(req.tipoServicio) + "</td>" +
-              "<td>" + textoSeguro(req.asunto) + "</td>" +
-              '<td class="request-description" title="' +
+              '<tr><td data-label="ID req.">' + textoSeguro(req.id) + "</td>" +
+              '<td data-label="APP">' + textoSeguro(req.app) + "</td>" +
+              '<td data-label="Tipo de servicio">' + textoSeguro(req.tipoServicio) + "</td>" +
+              '<td data-label="Asunto">' + textoSeguro(req.asunto) + "</td>" +
+              '<td class="request-description" data-label="Descripci\u00f3n" title="' +
               textoSeguro(req.descripcion) +
               '">' + textoSeguro(req.descripcion || "Sin descripci\u00f3n") + "</td>" +
-              "<td>" + textoSeguro(req.solicitadoPor) + "</td>" +
-              "<td>" + textoSeguro(req.responsable || "No asignado") + "</td>" +
-              "<td>" + textoSeguro(req.estado) + "</td>" +
-              '<td class="request-actions">' +
+              '<td data-label="Solicitado por">' + textoSeguro(req.solicitadoPor) + "</td>" +
+              '<td data-label="Responsable">' + textoSeguro(req.responsable || "No asignado") + "</td>" +
+              '<td data-label="Estado">' + textoSeguro(req.estado) + "</td>" +
+              '<td class="request-actions" data-label="Acciones">' +
+              '<div class="request-action-buttons">' +
               '<button class="action-btn icon-action view-btn" data-id="' +
               textoSeguro(req.id) +
               '" type="button" aria-label="Ver requerimiento ' +
               textoSeguro(req.id) +
-              '" title="Ver detalle"><span aria-hidden="true">&#128065;</span></button>' +
+              '" title="Ver detalle">' + ICONO_OJO + "</button>" +
               '<button class="action-btn icon-action edit-btn" data-id="' +
               textoSeguro(req.id) +
               '" type="button" aria-label="Editar requerimiento ' +
               textoSeguro(req.id) +
-              '" title="Editar"><span aria-hidden="true">&#9998;</span></button>' +
-              "</td></tr>"
+              '" title="Editar">' + ICONO_LAPIZ + "</button>" +
+              "</div></td></tr>"
             );
           })
           .join("")
       : '<tr class="empty-row"><td colspan="9">No tienes requerimientos registrados.</td></tr>';
+    renderizarPaginacionMisRequerimientos(paginacion);
   }
 
   function renderizarGestion(datos) {
@@ -171,19 +262,19 @@
           .map(function (req) {
             return (
               '<tr data-id="' + textoSeguro(req.id) + '">' +
-              "<td>" + textoSeguro(req.id) + "</td>" +
-              "<td>" + textoSeguro(req.asunto) + "</td>" +
-              "<td>" + textoSeguro(req.responsable || "No asignado") + "</td>" +
-              "<td>" + textoSeguro(req.mentor || "No asignado") + "</td>" +
-              '<td><select class="gestion-estado">' +
+              '<td data-label="ID req.">' + textoSeguro(req.id) + "</td>" +
+              '<td data-label="Asunto">' + textoSeguro(req.asunto) + "</td>" +
+              '<td data-label="Responsable">' + textoSeguro(req.responsable || "No asignado") + "</td>" +
+              '<td data-label="Mentor">' + textoSeguro(req.mentor || "No asignado") + "</td>" +
+              '<td data-label="Estado"><select class="gestion-estado">' +
               opcionesEstado(req.estado) +
               "</select></td>" +
-              '<td><input class="gestion-comentarios" type="text" value="' +
+              '<td data-label="Observaciones"><input class="gestion-comentarios" type="text" value="' +
               textoSeguro(req.comentarios) +
               '" aria-label="Observaciones del requerimiento ' +
               textoSeguro(req.id) +
               '"></td>' +
-              '<td><button class="action-btn save-btn" data-id="' +
+              '<td data-label="Acciones"><button class="action-btn save-btn" data-id="' +
               textoSeguro(req.id) +
               '">Guardar</button></td></tr>'
             );
