@@ -121,6 +121,12 @@
       .replace(/[^a-zA-Z0-9._-]/g, "_");
   }
 
+  function nombreSeguroSegmento(valor) {
+    return String(valor || "")
+      .trim()
+      .replace(/["*:<>?/\\|#%]/g, "_");
+  }
+
   function rutaCarpetaRequerimiento(requerimiento) {
     const nombreCarpeta = nombreSeguroCarpeta(
       requerimiento.id + "_" + requerimiento.spItemId
@@ -161,6 +167,47 @@
       tituloSeguro +
       "')"
     );
+  }
+
+  function endpointBibliotecaArchivos() {
+    const tituloSeguro = CONFIG.bibliotecaArchivos.replace(/'/g, "''");
+    return (
+      urlSitio() +
+      "/_api/web/lists/getbytitle('" +
+      tituloSeguro +
+      "')"
+    );
+  }
+
+  async function obtenerTiposDocumento() {
+    const respuesta = await solicitar(
+      endpointBibliotecaArchivos() +
+        "/fields/getbyinternalnameortitle('TipoDocumento')" +
+        "?$select=Choices",
+      {
+        method: "GET",
+        credentials: "same-origin",
+        headers: ODATA
+      }
+    );
+    if (!respuesta.ok) {
+      const detalle = await detalleErrorSharePoint(respuesta);
+      throw new Error(
+        "No se pudieron consultar las opciones de TipoDocumento (HTTP " +
+          respuesta.status +
+          ")" +
+          (detalle ? ": " + detalle : ".")
+      );
+    }
+
+    const datos = await respuesta.json();
+    const opciones =
+      datos.d &&
+      datos.d.Choices &&
+      Array.isArray(datos.d.Choices.results)
+        ? datos.d.Choices.results
+        : [];
+    return opciones.filter(Boolean).map(String);
   }
 
   function seleccionarCampos() {
@@ -743,8 +790,7 @@
     return desdeSharePoint(datos.d);
   }
 
-  async function asegurarCarpetaRequerimiento(requerimiento) {
-    const rutaCarpeta = rutaCarpetaRequerimiento(requerimiento);
+  async function asegurarCarpeta(rutaCarpeta) {
     const endpointCarpeta =
       urlSitio() +
       "/_api/web/GetFolderByServerRelativeUrl('" +
@@ -834,22 +880,30 @@
     };
   }
 
-  async function guardarArchivosRequerimiento(requerimiento, archivos) {
-    const listaArchivos = Array.prototype.slice.call(archivos || []);
-    if (!listaArchivos.length) {
+  async function guardarArchivosRequerimiento(
+    requerimiento,
+    archivosClasificados
+  ) {
+    const clasificaciones = Array.prototype.slice.call(
+      archivosClasificados || []
+    );
+    if (!clasificaciones.length) {
       return { cargados: [], errores: [], rutaCarpeta: "" };
     }
 
     const cargados = [];
     const errores = [];
-    let rutaCarpeta;
+    const rutasCategorias = {};
+    let rutaRequerimiento;
 
     try {
-      rutaCarpeta = await asegurarCarpetaRequerimiento(requerimiento);
+      rutaRequerimiento = await asegurarCarpeta(
+        rutaCarpetaRequerimiento(requerimiento)
+      );
     } catch (errorCarpeta) {
-      listaArchivos.forEach(function (archivo) {
+      clasificaciones.forEach(function (clasificacion) {
         errores.push({
-          nombre: archivo.name,
+          nombre: clasificacion.archivo.name,
           mensaje: errorCarpeta.message
         });
       });
@@ -860,9 +914,26 @@
       };
     }
 
-    for (const archivo of listaArchivos) {
+    for (const clasificacion of clasificaciones) {
+      const archivo = clasificacion.archivo;
+      const categoria = nombreSeguroSegmento(clasificacion.tipoDocumento);
       try {
-        cargados.push(await subirArchivo(rutaCarpeta, archivo));
+        if (!categoria) {
+          throw new Error(
+            "El archivo " + archivo.name + " no tiene tipo de documento."
+          );
+        }
+        if (!rutasCategorias[categoria]) {
+          rutasCategorias[categoria] = await asegurarCarpeta(
+            rutaRequerimiento + "/" + categoria
+          );
+        }
+        const archivoCargado = await subirArchivo(
+          rutasCategorias[categoria],
+          archivo
+        );
+        archivoCargado.tipoDocumento = clasificacion.tipoDocumento;
+        cargados.push(archivoCargado);
       } catch (error) {
         errores.push({
           nombre: archivo.name,
@@ -874,12 +945,11 @@
     return {
       cargados: cargados,
       errores: errores,
-      rutaCarpeta: rutaCarpeta
+      rutaCarpeta: rutaRequerimiento
     };
   }
 
-  async function obtenerArchivosRequerimiento(requerimiento) {
-    const rutaCarpeta = rutaCarpetaRequerimiento(requerimiento);
+  async function obtenerArchivosCarpeta(rutaCarpeta) {
     const endpoint =
       urlSitio() +
       "/_api/web/GetFolderByServerRelativeUrl('" +
@@ -911,6 +981,45 @@
         url: archivo.ServerRelativeUrl || ""
       };
     });
+  }
+
+  async function obtenerArchivosRequerimiento(requerimiento) {
+    const rutaCarpeta = rutaCarpetaRequerimiento(requerimiento);
+    const archivos = await obtenerArchivosCarpeta(rutaCarpeta);
+    const endpointSubcarpetas =
+      urlSitio() +
+      "/_api/web/GetFolderByServerRelativeUrl('" +
+      literalOData(rutaCarpeta) +
+      "')/Folders?$select=Name,ServerRelativeUrl";
+    const respuesta = await solicitar(endpointSubcarpetas, {
+      method: "GET",
+      credentials: "same-origin",
+      headers: ODATA
+    });
+
+    if (respuesta.status === 404) {
+      return archivos;
+    }
+    if (!respuesta.ok) {
+      const detalle = await detalleErrorSharePoint(respuesta);
+      throw new Error(
+        "No se pudieron consultar las categorías de documentos (HTTP " +
+          respuesta.status +
+          ")" +
+          (detalle ? ": " + detalle : ".")
+      );
+    }
+
+    const datos = await respuesta.json();
+    const archivosPorCategoria = await Promise.all(
+      datos.d.results.map(function (carpeta) {
+        return obtenerArchivosCarpeta(carpeta.ServerRelativeUrl);
+      })
+    );
+    archivosPorCategoria.forEach(function (grupo) {
+      Array.prototype.push.apply(archivos, grupo);
+    });
+    return archivos;
   }
 
   async function actualizar(id, cambios) {
@@ -1001,6 +1110,7 @@
     estaEnSharePoint: estaEnSharePoint,
     usuarioActual: usuarioActual,
     verificarConexion: verificarConexion,
+    obtenerTiposDocumento: obtenerTiposDocumento,
     obtenerTodos: obtenerTodos,
     obtenerPorId: obtenerPorId,
     crear: crear,

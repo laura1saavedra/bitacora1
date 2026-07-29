@@ -16,6 +16,13 @@
   let dialogoMensajeActual = null;
   let focoAntesDelDialogo = null;
   const REQUERIMIENTOS_POR_PAGINA = 5;
+  const TIPOS_DOCUMENTO_PREDETERMINADOS = [
+    "01_Historia_Usuario",
+    "02_Fuentes",
+    "03_Pruebas",
+    "04_Documentaci\u00f3n"
+  ];
+  let tiposDocumento = TIPOS_DOCUMENTO_PREDETERMINADOS.slice();
 
   const SELECTORES_CHROME_SHAREPOINT = [
     "#suiteBar",
@@ -239,10 +246,32 @@
     Vista.mostrarUsuario(Modelo.usuarioActual());
     const conectado = await comprobarConexion();
     if (conectado) {
+      await cargarTiposDocumento();
       await cargarDashboard();
     } else {
       Vista.renderizarTarjetas([]);
       Vista.renderizarTabla([]);
+    }
+  }
+
+  async function cargarTiposDocumento() {
+    try {
+      const opciones = await Modelo.obtenerTiposDocumento();
+      if (opciones.length) {
+        tiposDocumento = opciones;
+      }
+      global.BitacoraDiagnosticoTiposDocumento = {
+        origen: opciones.length ? "SharePoint" : "Valores predeterminados",
+        opciones: tiposDocumento.slice()
+      };
+    } catch (error) {
+      tiposDocumento = TIPOS_DOCUMENTO_PREDETERMINADOS.slice();
+      global.BitacoraDiagnosticoTiposDocumento = {
+        origen: "Valores predeterminados",
+        opciones: tiposDocumento.slice(),
+        error: error.message
+      };
+      console.warn("Consulta de tipos de documento:", error);
     }
   }
 
@@ -493,6 +522,7 @@
     document.getElementById("estado").value = "Pendiente";
     document.getElementById("fechaSolicitud").value = fechaActual();
     document.getElementById("archivosAdjuntos").value = "";
+    limpiarClasificacionArchivos();
 
     try {
       const datos = await Modelo.obtenerTodos();
@@ -557,6 +587,7 @@
       document.getElementById("btn-guardar").textContent = "Guardar cambios";
       document.getElementById("btn-limpiar").hidden = true;
       document.getElementById("archivosAdjuntos").value = "";
+      limpiarClasificacionArchivos();
 
       document.getElementById("id").value = req.id || "";
       document.getElementById("app").value = req.app || "";
@@ -601,7 +632,74 @@
     return campo ? Array.from(campo.files || []) : [];
   }
 
-  function validarArchivos(archivos) {
+  function limpiarClasificacionArchivos() {
+    const contenedor = document.getElementById("clasificacionArchivos");
+    contenedor.replaceChildren();
+    contenedor.hidden = true;
+  }
+
+  function crearSelectorTipoDocumento(indice) {
+    const selector = document.createElement("select");
+    selector.id = "tipoDocumentoArchivo-" + indice;
+    selector.dataset.indiceArchivo = String(indice);
+    selector.setAttribute("aria-label", "Tipo de documento");
+
+    const opcionInicial = document.createElement("option");
+    opcionInicial.value = "";
+    opcionInicial.textContent = "Seleccione el tipo";
+    selector.appendChild(opcionInicial);
+
+    tiposDocumento.forEach(function (tipo) {
+      const opcion = document.createElement("option");
+      opcion.value = tipo;
+      opcion.textContent = tipo;
+      selector.appendChild(opcion);
+    });
+    return selector;
+  }
+
+  function renderizarClasificacionArchivos() {
+    const archivos = archivosFormulario();
+    const contenedor = document.getElementById("clasificacionArchivos");
+    contenedor.replaceChildren();
+    contenedor.hidden = !archivos.length;
+
+    archivos.forEach(function (archivo, indice) {
+      const fila = document.createElement("div");
+      fila.className = "file-category-row";
+
+      const nombre = document.createElement("span");
+      nombre.className = "file-category-name";
+      nombre.textContent = archivo.name;
+      nombre.title = archivo.name;
+
+      fila.appendChild(nombre);
+      fila.appendChild(crearSelectorTipoDocumento(indice));
+      contenedor.appendChild(fila);
+    });
+  }
+
+  function archivosClasificadosFormulario() {
+    const archivos = archivosFormulario();
+    const selectores = Array.from(
+      document.querySelectorAll(
+        "#clasificacionArchivos select[data-indice-archivo]"
+      )
+    );
+    const tiposPorIndice = {};
+    selectores.forEach(function (selector) {
+      tiposPorIndice[selector.dataset.indiceArchivo] = selector.value.trim();
+    });
+
+    return archivos.map(function (archivo, indice) {
+      return {
+        archivo: archivo,
+        tipoDocumento: tiposPorIndice[String(indice)] || ""
+      };
+    });
+  }
+
+  function validarArchivos(archivosClasificados) {
     const extensionesPermitidas = [
       "pdf",
       "doc",
@@ -614,7 +712,9 @@
     ];
     const configuracion = Modelo.configuracion;
 
-    if (archivos.length > configuracion.cantidadMaximaArchivos) {
+    if (
+      archivosClasificados.length > configuracion.cantidadMaximaArchivos
+    ) {
       throw new Error(
         "Puede adjuntar máximo " +
           configuracion.cantidadMaximaArchivos +
@@ -622,7 +722,13 @@
       );
     }
 
-    archivos.forEach(function (archivo) {
+    archivosClasificados.forEach(function (clasificacion) {
+      const archivo = clasificacion.archivo;
+      if (!clasificacion.tipoDocumento) {
+        throw new Error(
+          "Seleccione el tipo de documento para " + archivo.name + "."
+        );
+      }
       const partesNombre = archivo.name.split(".");
       const extension =
         partesNombre.length > 1 ? partesNombre.pop().toLowerCase() : "";
@@ -771,14 +877,14 @@
 
   async function guardarFormulario() {
     const datos = datosFormulario();
-    const archivos = archivosFormulario();
+    const archivosClasificados = archivosClasificadosFormulario();
     const botonGuardar = document.getElementById("btn-guardar");
     if (!formularioValido(datos)) {
       return;
     }
     botonGuardar.disabled = true;
     try {
-      validarArchivos(archivos);
+      validarArchivos(archivosClasificados);
       if (requerimientoEnEdicion) {
         const requerimientoActualizado = await Modelo.actualizar(
           requerimientoEnEdicion.id,
@@ -794,7 +900,7 @@
         );
         const resultadoArchivos = await Modelo.guardarArchivosRequerimiento(
           requerimientoActualizado,
-          archivos
+          archivosClasificados
         );
         Modelo.agregarActividad(
           Modelo.usuarioActual().nombre,
@@ -822,7 +928,7 @@
         const requerimientoCreado = await Modelo.crear(datos);
         const resultadoArchivos = await Modelo.guardarArchivosRequerimiento(
           requerimientoCreado,
-          archivos
+          archivosClasificados
         );
         Modelo.agregarActividad(
           Modelo.usuarioActual().nombre,
@@ -1002,6 +1108,9 @@
     document
       .getElementById("btn-guardar")
       .addEventListener("click", guardarFormulario);
+    document
+      .getElementById("archivosAdjuntos")
+      .addEventListener("change", renderizarClasificacionArchivos);
     document
       .getElementById("btn-limpiar")
       .addEventListener("click", function (evento) {
