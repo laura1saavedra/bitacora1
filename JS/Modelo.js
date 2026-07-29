@@ -1168,6 +1168,112 @@
     }
   }
 
+// ============================================================
+// BUSCAR USUARIOS MICROSOFT 365
+// ------------------------------------------------------------
+// Consulta los usuarios disponibles en SharePoint Online.
+//
+// Recibe:
+// texto -> nombre o correo que escribe el usuario.
+//
+// Devuelve:
+// lista de usuarios encontrados.
+//
+// No modifica listas ni información de SharePoint.
+// Solo consulta usuarios.
+// ============================================================
+
+async function buscarUsuariosMicrosoft(texto) {
+
+    // Si no hay texto suficiente no consulta
+    if (!texto || texto.trim().length < 3) {
+
+        return [];
+
+    }
+
+
+    const url =
+        urlSitio() +
+        "/_api/SP.UI.ApplicationPages.ClientPeoplePickerWebServiceInterface.clientPeoplePickerSearchUser";
+
+
+    const datos = {
+
+        queryParams: {
+
+            __metadata: {
+                type:
+                "SP.UI.ApplicationPages.ClientPeoplePickerQueryParameters"
+            },
+
+            AllowEmailAddresses: true,
+
+            AllowMultipleEntities: true,
+
+            MaximumEntitySuggestions: 10,
+
+            PrincipalSource: 15,
+
+            PrincipalType: 1,
+
+            QueryString: texto
+
+        }
+
+    };
+
+
+    const respuesta = await solicitar(url, {
+
+        method: "POST",
+
+        credentials: "same-origin",
+
+        headers: Object.assign({}, ODATA, {
+
+            "Content-Type":
+            "application/json;odata=verbose"
+
+        }),
+
+        body: JSON.stringify(datos)
+
+    });
+
+
+    if (!respuesta.ok) {
+
+        throw new Error(
+            "No fue posible consultar usuarios de Microsoft 365."
+        );
+
+    }
+
+
+    const resultado = await respuesta.json();
+
+
+    const usuarios =
+        JSON.parse(resultado.d.ClientPeoplePickerSearchUser);
+
+
+    return usuarios.map(function(usuario){
+
+        return {
+
+            nombre: usuario.DisplayText,
+
+            correo: usuario.EntityData?.Email || ""
+
+        };
+
+    });
+
+
+}
+
+
   const CLAVE_BITACORA = "backlog_bitacora";
 
   function obtenerBitacora() {
@@ -1198,6 +1304,7 @@
     guardarArchivosRequerimiento: guardarArchivosRequerimiento,
     obtenerArchivosRequerimiento: obtenerArchivosRequerimiento,
     obtenerDocumentosRequerimiento: obtenerDocumentosRequerimiento,
+    buscarUsuariosMicrosoft: buscarUsuariosMicrosoft,
     actualizar: actualizar,
     eliminar: eliminar,
     obtenerBitacora: obtenerBitacora,

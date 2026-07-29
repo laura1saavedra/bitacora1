@@ -11,8 +11,11 @@
   let observadorChromeSharePoint = null;
   let documentoObservadoSharePoint = null;
   let requerimientoEnEdicion = null;
+  // Usuarios seleccionados para el campo Solicitado por
+  let usuariosSeleccionados = [];
   let requerimientosPropios = [];
   let paginaMisRequerimientos = 1;
+  let paginaBacklog = 1;
   let dialogoMensajeActual = null;
   let focoAntesDelDialogo = null;
   const REQUERIMIENTOS_POR_PAGINA = 5;
@@ -329,11 +332,13 @@
 
   async function cargarDashboard() {
     try {
-      requerimientos = await Modelo.obtenerTodos();
+
+      requerimientos = (await Modelo.obtenerTodos()).reverse();
       Vista.renderizarTarjetas(requerimientos);
-      Vista.renderizarTabla(requerimientos);
       Vista.renderizarFiltros(requerimientos);
-      Vista.renderizarActividad(Modelo.obtenerBitacora());
+      paginaBacklog = 1;
+      renderizarPaginaBacklog();
+
     } catch (error) {
       console.error("Carga del dashboard:", error);
       Vista.renderizarTarjetas([]);
@@ -400,8 +405,50 @@
     });
   }
 
+  function renderizarPaginaBacklog() {
+    const datosFiltrados = filtrarRequerimientos();
+    const total = datosFiltrados.length;
+    const totalPaginas = Math.max(
+      1,
+      Math.ceil(total / REQUERIMIENTOS_POR_PAGINA)
+    );
+    paginaBacklog = Math.min(Math.max(1, paginaBacklog), totalPaginas);
+    const indiceInicial = (paginaBacklog - 1) * REQUERIMIENTOS_POR_PAGINA;
+    const datosPagina = datosFiltrados.slice(
+      indiceInicial,
+      indiceInicial + REQUERIMIENTOS_POR_PAGINA
+    );
+
+    Vista.renderizarTabla(datosPagina, {
+      pagina: paginaBacklog,
+      totalPaginas: totalPaginas,
+      total: total,
+      inicio: total ? indiceInicial + 1 : 0,
+      fin: Math.min(indiceInicial + REQUERIMIENTOS_POR_PAGINA, total)
+    });
+  }
+
+  function cambiarPaginaBacklog(pagina) {
+    const destino = Number(pagina);
+    const totalPaginas = Math.max(
+      1,
+      Math.ceil(filtrarRequerimientos().length / REQUERIMIENTOS_POR_PAGINA)
+    );
+    if (
+      !Number.isInteger(destino) ||
+      destino < 1 ||
+      destino > totalPaginas ||
+      destino === paginaBacklog
+    ) {
+      return;
+    }
+    paginaBacklog = destino;
+    renderizarPaginaBacklog();
+  }
+
   function aplicarFiltros() {
-    Vista.renderizarTabla(filtrarRequerimientos());
+    paginaBacklog = 1;
+    renderizarPaginaBacklog();
   }
 
   function escaparCSV(valor) {
@@ -412,14 +459,30 @@
     return texto;
   }
 
-  function exportarCSV() {
+  async function exportarCSV() {
     const datos = filtrarRequerimientos();
     if (!datos.length) {
-      mostrarAlerta({
+      await mostrarAlerta({
         icon: "info",
         title: "Sin datos para exportar",
         text: "No hay requerimientos que coincidan con los filtros actuales."
       });
+      return;
+    }
+
+    const confirmacion = await mostrarDialogo({
+      icon: "info",
+      title: "Exportar CSV",
+      text:
+        "Se descargará un archivo CSV con " +
+        datos.length +
+        (datos.length === 1 ? " requerimiento" : " requerimientos") +
+        " según los filtros actuales.",
+      showCancelButton: true,
+      confirmButtonText: "Descargar",
+      cancelButtonText: "Cancelar"
+    });
+    if (!confirmacion.isConfirmed) {
       return;
     }
 
@@ -466,17 +529,12 @@
 
   function limpiarFiltros() {
     document.getElementById("buscador").value = "";
-    [
-      "filtro-app",
-      "filtro-responsable",
-      "filtro-estado",
-      "filtro-prioridad",
-      "filtro-fecha"
-    ]
+    ["filtro-app", "filtro-responsable", "filtro-estado", "filtro-prioridad", "filtro-fecha"]
       .forEach(function (id) {
         document.getElementById(id).value = "";
       });
-    Vista.renderizarTabla(requerimientos);
+    paginaBacklog = 1;
+    renderizarPaginaBacklog();
   }
 
   async function verRequerimiento(id) {
@@ -1288,6 +1346,155 @@
     }
     return true;
   }
+// ============================================================
+// RENDERIZAR USUARIOS SELECCIONADOS
+// ------------------------------------------------------------
+// Muestra las personas elegidas en el formulario.
+// ============================================================
+
+function renderizarUsuariosSeleccionados() {
+
+    const contenedor =
+        document.getElementById("usuariosSeleccionados");
+
+
+    if (!contenedor) {
+        return;
+    }
+
+
+    contenedor.innerHTML =
+        usuariosSeleccionados.length
+        ?
+        usuariosSeleccionados.map(function(usuario, index){
+
+            return (
+
+                '<div class="usuario-chip">' +
+
+                usuario.nombre +
+
+                '<button type="button" data-index="' +
+                index +
+                '">×</button>' +
+
+                '</div>'
+
+            );
+
+        }).join("")
+
+        :
+
+        "<span>No hay usuarios seleccionados</span>";
+
+
+    // Actualiza el campo que se guarda en SharePoint
+
+    const campo =
+        document.getElementById("solicitadoPor");
+
+
+    if(campo){
+
+        campo.value =
+            usuariosSeleccionados
+            .map(function(usuario){
+                return usuario.nombre;
+            })
+            .join("\n");
+
+    }
+
+}
+
+// ============================================================
+// BUSCAR USUARIOS MICROSOFT
+// ============================================================
+
+async function buscarUsuarios() {
+
+
+    const entrada =
+        document.getElementById("buscarUsuario");
+
+
+    const resultados =
+        document.getElementById("resultadoUsuarios");
+
+
+    if(!entrada || !resultados){
+
+        return;
+
+    }
+
+
+    const texto = entrada.value.trim();
+
+
+    if(texto.length < 3){
+
+        resultados.hidden = true;
+
+        resultados.innerHTML = "";
+
+        return;
+
+    }
+
+
+    try {
+
+
+        const usuarios =
+            await Modelo.buscarUsuariosMicrosoft(texto);
+
+
+
+        resultados.innerHTML =
+            usuarios.map(function(usuario){
+
+
+                return (
+
+                '<button type="button" class="usuario-opcion" ' +
+
+                'data-nombre="' +
+                usuario.nombre +
+                '" ' +
+
+                'data-correo="' +
+                usuario.correo +
+                '">' +
+
+                usuario.nombre +
+
+                '</button>'
+
+                );
+
+
+            }).join("");
+
+
+
+        resultados.hidden = usuarios.length === 0;
+
+
+
+    } catch(error){
+
+
+        console.error(
+            "Error buscando usuarios:",
+            error
+        );
+
+
+    }
+
+}
 
   async function guardarFormulario() {
     const datos = datosFormulario();
@@ -1488,9 +1695,17 @@
     }
     eventosRegistrados = true;
 
-    document
-      .getElementById("btnAgregarPersona")
-      .addEventListener("click", agregarPersona);
+    const btnAgregarPersona =
+  document.getElementById("btnAgregarPersona");
+
+if (btnAgregarPersona) {
+
+  btnAgregarPersona.addEventListener(
+    "click",
+    agregarPersona
+  );
+
+}
     document.getElementById("buscador").addEventListener("input", aplicarFiltros);
     [
       "filtro-app",
@@ -1508,9 +1723,11 @@
     document
       .getElementById("btn-exportar")
       .addEventListener("click", exportarCSV);
-    document
+   document
       .getElementById("btn-actualizar")
-      .addEventListener("click", cargarDashboard);
+      .addEventListener("click", function () {
+        global.location.reload();
+      });
     document.querySelectorAll("[data-vista]").forEach(function (boton) {
       boton.addEventListener("click", function () {
         const vista = boton.dataset.vista;
@@ -1585,7 +1802,14 @@
           cambiarPaginaMisRequerimientos(boton.dataset.pagina);
         }
       });
-
+    document
+      .getElementById("controles-paginacion")
+      .addEventListener("click", function (evento) {
+        const boton = evento.target.closest("button[data-pagina]");
+        if (boton && !boton.disabled) {
+          cambiarPaginaBacklog(boton.dataset.pagina);
+        }
+      });
     document
       .getElementById("tabla-gestion")
       .addEventListener("click", function (evento) {
@@ -1660,6 +1884,91 @@
         }
       }
     });
+    // ============================================================
+// EVENTO BUSCADOR DE USUARIOS
+// ============================================================
+
+const inputBuscarUsuario =
+    document.getElementById("buscarUsuario");
+
+
+if (inputBuscarUsuario) {
+
+    inputBuscarUsuario.addEventListener(
+        "input",
+        buscarUsuarios
+    );
+
+}
+// ============================================================
+// SELECCIONAR USUARIO EN RESULTADOS
+// ============================================================
+
+const resultadosUsuarios =
+    document.getElementById("resultadoUsuarios");
+
+
+if (resultadosUsuarios) {
+
+    resultadosUsuarios.addEventListener(
+        "click",
+        function(evento){
+
+
+            const boton =
+                evento.target.closest(
+                    ".usuario-opcion"
+                );
+
+
+            if(!boton){
+                return;
+            }
+
+
+            const usuario = {
+
+                nombre:
+                    boton.dataset.nombre,
+
+                correo:
+                    boton.dataset.correo
+
+            };
+
+
+            // Evita usuarios repetidos
+            const existe =
+                usuariosSeleccionados.some(
+                    function(u){
+
+                        return u.correo === usuario.correo;
+
+                    }
+                );
+
+
+            if(!existe){
+
+                usuariosSeleccionados.push(usuario);
+
+            }
+
+
+            renderizarUsuariosSeleccionados();
+
+
+            // Limpia búsqueda
+            inputBuscarUsuario.value = "";
+
+
+            resultadosUsuarios.hidden = true;
+
+
+        }
+    );
+
+}
   }
 
   global.Controlador = Object.freeze({
@@ -1670,6 +1979,7 @@
     prepararFormulario: prepararFormulario,
     cargarMisRequerimientos: cargarMisRequerimientos,
     cambiarPaginaMisRequerimientos: cambiarPaginaMisRequerimientos,
+    cambiarPaginaBacklog: cambiarPaginaBacklog,
     cargarGestion: cargarGestion
   });
 
