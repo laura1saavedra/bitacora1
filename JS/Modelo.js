@@ -7,6 +7,9 @@
 
   const CONFIG = Object.freeze({
     lista: "Backlog",
+    bibliotecaArchivos: "ArchivosRequerimientos",
+    tamanoMaximoArchivo: 20 * 1024 * 1024,
+    cantidadMaximaArchivos: 10,
     sitioAlterno:
       "https://globalhitss.sharepoint.com/sites/AppsColombiaDesarrollo/RetirosDeCesantiasDesarrollo",
     tamanoPagina: 100,
@@ -98,6 +101,37 @@
     return contexto && contexto.webAbsoluteUrl
       ? contexto.webAbsoluteUrl
       : CONFIG.sitioAlterno;
+  }
+
+  function rutaRelativaSitio() {
+    const contexto = global._spPageContextInfo;
+    if (contexto && contexto.webServerRelativeUrl) {
+      return String(contexto.webServerRelativeUrl).replace(/\/$/, "");
+    }
+    return new URL(urlSitio()).pathname.replace(/\/$/, "");
+  }
+
+  function literalOData(valor) {
+    return String(valor).replace(/'/g, "''");
+  }
+
+  function nombreSeguroCarpeta(valor) {
+    return String(valor || "")
+      .trim()
+      .replace(/[^a-zA-Z0-9._-]/g, "_");
+  }
+
+  function rutaCarpetaRequerimiento(requerimiento) {
+    const nombreCarpeta = nombreSeguroCarpeta(
+      requerimiento.id + "_" + requerimiento.spItemId
+    );
+    return (
+      rutaRelativaSitio() +
+      "/" +
+      CONFIG.bibliotecaArchivos +
+      "/" +
+      nombreCarpeta
+    );
   }
 
   function estaEnSharePoint() {
@@ -645,9 +679,32 @@
       );
     }
     const datos = await respuesta.json();
-    return datos.d.results.length
-      ? desdeSharePoint(datos.d.results[0])
-      : undefined;
+    if (!datos.d.results.length) {
+      return undefined;
+    }
+
+    const requerimiento = desdeSharePoint(datos.d.results[0]);
+    try {
+      const archivosBiblioteca = await obtenerArchivosRequerimiento(
+        requerimiento
+      );
+      const archivosCombinados = requerimiento.archivosAdjuntos.concat(
+        archivosBiblioteca
+      );
+      requerimiento.archivosAdjuntos = archivosCombinados.filter(function (
+        archivo,
+        indice
+      ) {
+        return (
+          archivosCombinados.findIndex(function (candidato) {
+            return candidato.url === archivo.url;
+          }) === indice
+        );
+      });
+    } catch (error) {
+      console.warn("Consulta de archivos del requerimiento:", error);
+    }
+    return requerimiento;
   }
 
   async function crear(item) {
@@ -684,6 +741,176 @@
     }
     const datos = await respuesta.json();
     return desdeSharePoint(datos.d);
+  }
+
+  async function asegurarCarpetaRequerimiento(requerimiento) {
+    const rutaCarpeta = rutaCarpetaRequerimiento(requerimiento);
+    const endpointCarpeta =
+      urlSitio() +
+      "/_api/web/GetFolderByServerRelativeUrl('" +
+      literalOData(rutaCarpeta) +
+      "')";
+    const existente = await solicitar(endpointCarpeta, {
+      method: "GET",
+      credentials: "same-origin",
+      headers: ODATA
+    });
+
+    if (existente.ok) {
+      return rutaCarpeta;
+    }
+    if (existente.status !== 404) {
+      const detalleConsulta = await detalleErrorSharePoint(existente);
+      throw new Error(
+        "No se pudo comprobar la carpeta de archivos (HTTP " +
+          existente.status +
+          ")" +
+          (detalleConsulta ? ": " + detalleConsulta : ".")
+      );
+    }
+
+    const valorDigest = await digest();
+    const respuesta = await solicitar(urlSitio() + "/_api/web/folders", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: Object.assign({}, ODATA, {
+        "Content-Type": "application/json;odata=verbose",
+        "X-RequestDigest": valorDigest
+      }),
+      body: JSON.stringify({
+        __metadata: { type: "SP.Folder" },
+        ServerRelativeUrl: rutaCarpeta
+      })
+    });
+
+    if (!respuesta.ok) {
+      const detalle = await detalleErrorSharePoint(respuesta);
+      throw new Error(
+        "No se pudo crear la carpeta del requerimiento (HTTP " +
+          respuesta.status +
+          ")" +
+          (detalle ? ": " + detalle : ".")
+      );
+    }
+    return rutaCarpeta;
+  }
+
+  async function subirArchivo(rutaCarpeta, archivo) {
+    const valorDigest = await digest();
+    const endpoint =
+      urlSitio() +
+      "/_api/web/GetFolderByServerRelativeUrl('" +
+      literalOData(rutaCarpeta) +
+      "')/Files/Add(url='" +
+      literalOData(archivo.name) +
+      "',overwrite=false)";
+    const respuesta = await solicitar(endpoint, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: Object.assign({}, ODATA, {
+        "X-RequestDigest": valorDigest
+      }),
+      body: archivo
+    });
+
+    if (!respuesta.ok) {
+      const detalle = await detalleErrorSharePoint(respuesta);
+      throw new Error(
+        "No se pudo cargar " +
+          archivo.name +
+          " (HTTP " +
+          respuesta.status +
+          ")" +
+          (detalle ? ": " + detalle : ".")
+      );
+    }
+    const datos = await respuesta.json();
+    return {
+      nombre: archivo.name,
+      url:
+        datos.d && datos.d.ServerRelativeUrl
+          ? datos.d.ServerRelativeUrl
+          : rutaCarpeta + "/" + archivo.name
+    };
+  }
+
+  async function guardarArchivosRequerimiento(requerimiento, archivos) {
+    const listaArchivos = Array.prototype.slice.call(archivos || []);
+    if (!listaArchivos.length) {
+      return { cargados: [], errores: [], rutaCarpeta: "" };
+    }
+
+    const cargados = [];
+    const errores = [];
+    let rutaCarpeta;
+
+    try {
+      rutaCarpeta = await asegurarCarpetaRequerimiento(requerimiento);
+    } catch (errorCarpeta) {
+      listaArchivos.forEach(function (archivo) {
+        errores.push({
+          nombre: archivo.name,
+          mensaje: errorCarpeta.message
+        });
+      });
+      return {
+        cargados: cargados,
+        errores: errores,
+        rutaCarpeta: ""
+      };
+    }
+
+    for (const archivo of listaArchivos) {
+      try {
+        cargados.push(await subirArchivo(rutaCarpeta, archivo));
+      } catch (error) {
+        errores.push({
+          nombre: archivo.name,
+          mensaje: error.message
+        });
+      }
+    }
+
+    return {
+      cargados: cargados,
+      errores: errores,
+      rutaCarpeta: rutaCarpeta
+    };
+  }
+
+  async function obtenerArchivosRequerimiento(requerimiento) {
+    const rutaCarpeta = rutaCarpetaRequerimiento(requerimiento);
+    const endpoint =
+      urlSitio() +
+      "/_api/web/GetFolderByServerRelativeUrl('" +
+      literalOData(rutaCarpeta) +
+      "')/Files?$select=Name,ServerRelativeUrl";
+    const respuesta = await solicitar(endpoint, {
+      method: "GET",
+      credentials: "same-origin",
+      headers: ODATA
+    });
+
+    if (respuesta.status === 404) {
+      return [];
+    }
+    if (!respuesta.ok) {
+      const detalle = await detalleErrorSharePoint(respuesta);
+      throw new Error(
+        "No se pudieron consultar los archivos del requerimiento (HTTP " +
+          respuesta.status +
+          ")" +
+          (detalle ? ": " + detalle : ".")
+      );
+    }
+
+    const datos = await respuesta.json();
+    return datos.d.results.map(function (archivo) {
+      return {
+        nombre: archivo.Name || "",
+        url: archivo.ServerRelativeUrl || ""
+      };
+    });
   }
 
   async function actualizar(id, cambios) {
@@ -777,6 +1004,8 @@
     obtenerTodos: obtenerTodos,
     obtenerPorId: obtenerPorId,
     crear: crear,
+    guardarArchivosRequerimiento: guardarArchivosRequerimiento,
+    obtenerArchivosRequerimiento: obtenerArchivosRequerimiento,
     actualizar: actualizar,
     eliminar: eliminar,
     obtenerBitacora: obtenerBitacora,

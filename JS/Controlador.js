@@ -492,6 +492,7 @@
       Modelo.usuarioActual().nombre;
     document.getElementById("estado").value = "Pendiente";
     document.getElementById("fechaSolicitud").value = fechaActual();
+    document.getElementById("archivosAdjuntos").value = "";
 
     try {
       const datos = await Modelo.obtenerTodos();
@@ -555,6 +556,7 @@
         "Actualiza la informaci\u00f3n de tu solicitud.";
       document.getElementById("btn-guardar").textContent = "Guardar cambios";
       document.getElementById("btn-limpiar").hidden = true;
+      document.getElementById("archivosAdjuntos").value = "";
 
       document.getElementById("id").value = req.id || "";
       document.getElementById("app").value = req.app || "";
@@ -592,6 +594,107 @@
       estado: document.getElementById("estado").value,
       fechaSolicitud: document.getElementById("fechaSolicitud").value
     };
+  }
+
+  function archivosFormulario() {
+    const campo = document.getElementById("archivosAdjuntos");
+    return campo ? Array.from(campo.files || []) : [];
+  }
+
+  function validarArchivos(archivos) {
+    const extensionesPermitidas = [
+      "pdf",
+      "doc",
+      "docx",
+      "xls",
+      "xlsx",
+      "png",
+      "jpg",
+      "jpeg"
+    ];
+    const configuracion = Modelo.configuracion;
+
+    if (archivos.length > configuracion.cantidadMaximaArchivos) {
+      throw new Error(
+        "Puede adjuntar máximo " +
+          configuracion.cantidadMaximaArchivos +
+          " archivos por operación."
+      );
+    }
+
+    archivos.forEach(function (archivo) {
+      const partesNombre = archivo.name.split(".");
+      const extension =
+        partesNombre.length > 1 ? partesNombre.pop().toLowerCase() : "";
+
+      if (extensionesPermitidas.indexOf(extension) === -1) {
+        throw new Error(
+          "El archivo " +
+            archivo.name +
+            " tiene una extensión no permitida."
+        );
+      }
+      if (archivo.size > configuracion.tamanoMaximoArchivo) {
+        throw new Error(
+          "El archivo " +
+            archivo.name +
+            " supera el tamaño máximo de 20 MB."
+        );
+      }
+      if (/[#%]/.test(archivo.name)) {
+        throw new Error(
+          "El nombre " +
+            archivo.name +
+            " contiene # o %. Cambie el nombre del archivo antes de adjuntarlo."
+        );
+      }
+    });
+  }
+
+  function textoResultadoArchivos(resultado) {
+    if (!resultado || !resultado.cargados.length) {
+      return "";
+    }
+    return (
+      " Se cargaron " +
+      resultado.cargados.length +
+      (resultado.cargados.length === 1 ? " archivo." : " archivos.")
+    );
+  }
+
+  async function mostrarErroresCarga(resultado, idRequerimiento) {
+    if (!resultado || !resultado.errores.length) {
+      return false;
+    }
+    const primerDetalle = resultado.errores[0].mensaje
+      ? " Detalle: " + resultado.errores[0].mensaje
+      : "";
+    global.BitacoraDiagnosticoArchivos = {
+      requerimiento: idRequerimiento,
+      resultado: resultado,
+      fecha: new Date().toISOString()
+    };
+    console.error(
+      "Diagnóstico de carga de archivos:",
+      global.BitacoraDiagnosticoArchivos
+    );
+    await mostrarAlerta({
+      icon: "warning",
+      title: "Requerimiento guardado con archivos pendientes",
+      text:
+        "El requerimiento " +
+        idRequerimiento +
+        " fue guardado, pero no se pudieron cargar: " +
+        resultado.errores
+          .map(function (error) {
+            return error.nombre;
+          })
+          .join(", ") +
+        "." +
+        primerDetalle +
+        " Puede editar el requerimiento e intentarlo nuevamente."
+    });
+    return true;
   }
 
   async function agregarPersona() {
@@ -668,45 +771,82 @@
 
   async function guardarFormulario() {
     const datos = datosFormulario();
+    const archivos = archivosFormulario();
+    const botonGuardar = document.getElementById("btn-guardar");
     if (!formularioValido(datos)) {
       return;
     }
+    botonGuardar.disabled = true;
     try {
+      validarArchivos(archivos);
       if (requerimientoEnEdicion) {
-        await Modelo.actualizar(requerimientoEnEdicion.id, {
-          app: datos.app,
-          tipoServicio: datos.tipoServicio,
-          asunto: datos.asunto,
-          descripcion: datos.descripcion,
-          casoOrigen: datos.casoOrigen,
-          prioridad: datos.prioridad,
-          solicitadoPor: datos.solicitadoPor
-        });
+        const requerimientoActualizado = await Modelo.actualizar(
+          requerimientoEnEdicion.id,
+          {
+            app: datos.app,
+            tipoServicio: datos.tipoServicio,
+            asunto: datos.asunto,
+            descripcion: datos.descripcion,
+            casoOrigen: datos.casoOrigen,
+            prioridad: datos.prioridad,
+            solicitadoPor: datos.solicitadoPor
+          }
+        );
+        const resultadoArchivos = await Modelo.guardarArchivosRequerimiento(
+          requerimientoActualizado,
+          archivos
+        );
         Modelo.agregarActividad(
           Modelo.usuarioActual().nombre,
           "Edit\u00f3 el requerimiento " + requerimientoEnEdicion.id
         );
         requerimientoEnEdicion = null;
+        if (
+          await mostrarErroresCarga(
+            resultadoArchivos,
+            requerimientoActualizado.id
+          )
+        ) {
+          Vista.mostrarMisRequerimientos();
+          return;
+        }
         await mostrarAlerta({
           icon: "success",
           title: "Requerimiento actualizado",
-          text: "Los cambios fueron guardados correctamente."
+          text:
+            "Los cambios fueron guardados correctamente." +
+            textoResultadoArchivos(resultadoArchivos)
         });
         Vista.mostrarMisRequerimientos();
       } else {
-        await Modelo.crear(datos);
+        const requerimientoCreado = await Modelo.crear(datos);
+        const resultadoArchivos = await Modelo.guardarArchivosRequerimiento(
+          requerimientoCreado,
+          archivos
+        );
         Modelo.agregarActividad(
           Modelo.usuarioActual().nombre,
           "Cre\u00f3 el requerimiento " + datos.id + " - " + datos.asunto
         );
+        if (
+          await mostrarErroresCarga(resultadoArchivos, requerimientoCreado.id)
+        ) {
+          Vista.mostrarDashboard();
+          return;
+        }
         await mostrarAlerta({
           icon: "success",
           title: "\u00a1Requerimiento registrado!",
           html:
             "<b>ID del requerimiento:</b> " +
             datos.id +
-            "<br><br>El requerimiento fue registrado correctamente.",
-          text: "Requerimiento " + datos.id + " registrado correctamente.",
+            "<br><br>El requerimiento fue registrado correctamente." +
+            textoResultadoArchivos(resultadoArchivos),
+          text:
+            "Requerimiento " +
+            datos.id +
+            " registrado correctamente." +
+            textoResultadoArchivos(resultadoArchivos),
           confirmButtonText: "Aceptar",
           confirmButtonColor: "#2f6fed"
         });
@@ -718,6 +858,8 @@
         title: "No se pudo guardar el requerimiento",
         text: error.message
       });
+    } finally {
+      botonGuardar.disabled = false;
     }
   }
 
