@@ -576,11 +576,24 @@
         endpointLista() +
           "/fields?$select=Title,InternalName,TypeAsString,Hidden,ReadOnlyField,Required",
         opciones
+      ),
+      solicitar(
+        endpointBibliotecaArchivos() +
+          "?$select=Title,ItemCount,RootFolder/ServerRelativeUrl&$expand=RootFolder",
+        opciones
+      ),
+      solicitar(
+        endpointBibliotecaArchivos() +
+          "/fields/getbyinternalnameortitle('TipoDocumento')" +
+          "?$select=Title,InternalName,TypeAsString,Choices",
+        opciones
       )
     ]);
     const respuestaSitio = resultados[0];
     const respuestaLista = resultados[1];
     const respuestaCampos = resultados[2];
+    const respuestaBiblioteca = resultados[3];
+    const respuestaTipoDocumento = resultados[4];
 
     if (!respuestaSitio.ok) {
       throw new Error(
@@ -605,10 +618,32 @@
           ")."
       );
     }
+    if (!respuestaBiblioteca.ok) {
+      const motivoBiblioteca =
+        respuestaBiblioteca.status === 404
+          ? "La biblioteca " +
+            CONFIG.bibliotecaArchivos +
+            " no existe con ese nombre."
+          : respuestaBiblioteca.status === 401 ||
+              respuestaBiblioteca.status === 403
+            ? "El usuario no tiene permiso para acceder a " +
+              CONFIG.bibliotecaArchivos +
+              "."
+            : "No se pudo validar " +
+              CONFIG.bibliotecaArchivos +
+              " (HTTP " +
+              respuestaBiblioteca.status +
+              ").";
+      throw new Error(motivoBiblioteca);
+    }
 
     const datosSitio = await respuestaSitio.json();
     const datosLista = await respuestaLista.json();
     const datosCampos = await respuestaCampos.json();
+    const datosBiblioteca = await respuestaBiblioteca.json();
+    const datosTipoDocumento = respuestaTipoDocumento.ok
+      ? await respuestaTipoDocumento.json()
+      : null;
     const campos = datosCampos.d.results.map(function (campo) {
       return {
         titulo: campo.Title,
@@ -651,17 +686,44 @@
         "Revisar columnas Persona: " + columnasPersonaInvalidas.join(", ")
       );
     }
+    if (!respuestaTipoDocumento.ok) {
+      advertencias.push(
+        respuestaTipoDocumento.status === 404
+          ? "Crear en " +
+            CONFIG.bibliotecaArchivos +
+            " la columna de opciones TipoDocumento."
+          : "No se pudo validar la columna TipoDocumento (HTTP " +
+            respuestaTipoDocumento.status +
+            ")."
+      );
+    } else if (
+      datosTipoDocumento.d.TypeAsString !== "Choice" &&
+      datosTipoDocumento.d.TypeAsString !== "MultiChoice"
+    ) {
+      advertencias.push(
+        "La columna TipoDocumento debe ser de tipo Elección."
+      );
+    }
 
     tipoEntidadLista = datosLista.d.ListItemEntityTypeFullName;
     return {
       sitio: datosSitio.d,
       lista: datosLista.d,
+      biblioteca: datosBiblioteca.d,
+      columnaTipoDocumento: datosTipoDocumento
+        ? datosTipoDocumento.d
+        : null,
       campos: campos,
       columnasFaltantes: columnasFaltantes,
       columnasPersonaInvalidas: columnasPersonaInvalidas,
       advertencias: advertencias,
       urlLista:
-        urlSitio() + "/Lists/" + encodeURIComponent(CONFIG.lista) + "/AllItems.aspx"
+        urlSitio() + "/Lists/" + encodeURIComponent(CONFIG.lista) + "/AllItems.aspx",
+      urlBiblioteca:
+        urlSitio() +
+        "/" +
+        encodeURIComponent(CONFIG.bibliotecaArchivos) +
+        "/Forms/AllItems.aspx"
     };
   }
 
@@ -949,12 +1011,12 @@
     };
   }
 
-  async function obtenerArchivosCarpeta(rutaCarpeta) {
+  async function obtenerArchivosCarpeta(rutaCarpeta, tipoDocumento) {
     const endpoint =
       urlSitio() +
       "/_api/web/GetFolderByServerRelativeUrl('" +
       literalOData(rutaCarpeta) +
-      "')/Files?$select=Name,ServerRelativeUrl";
+      "')/Files?$select=Name,ServerRelativeUrl,TimeLastModified";
     const respuesta = await solicitar(endpoint, {
       method: "GET",
       credentials: "same-origin",
@@ -978,14 +1040,19 @@
     return datos.d.results.map(function (archivo) {
       return {
         nombre: archivo.Name || "",
-        url: archivo.ServerRelativeUrl || ""
+        url: archivo.ServerRelativeUrl || "",
+        modificado: archivo.TimeLastModified || "",
+        tipoDocumento: tipoDocumento || "Sin clasificaci\u00f3n"
       };
     });
   }
 
   async function obtenerArchivosRequerimiento(requerimiento) {
     const rutaCarpeta = rutaCarpetaRequerimiento(requerimiento);
-    const archivos = await obtenerArchivosCarpeta(rutaCarpeta);
+    const archivos = await obtenerArchivosCarpeta(
+      rutaCarpeta,
+      "Sin clasificaci\u00f3n"
+    );
     const endpointSubcarpetas =
       urlSitio() +
       "/_api/web/GetFolderByServerRelativeUrl('" +
@@ -1013,13 +1080,27 @@
     const datos = await respuesta.json();
     const archivosPorCategoria = await Promise.all(
       datos.d.results.map(function (carpeta) {
-        return obtenerArchivosCarpeta(carpeta.ServerRelativeUrl);
+        return obtenerArchivosCarpeta(
+          carpeta.ServerRelativeUrl,
+          carpeta.Name
+        );
       })
     );
     archivosPorCategoria.forEach(function (grupo) {
       Array.prototype.push.apply(archivos, grupo);
     });
     return archivos;
+  }
+
+  async function obtenerDocumentosRequerimiento(requerimientoOId) {
+    const requerimiento =
+      typeof requerimientoOId === "object" && requerimientoOId
+        ? requerimientoOId
+        : await obtenerPorId(requerimientoOId);
+    if (!requerimiento) {
+      return [];
+    }
+    return obtenerArchivosRequerimiento(requerimiento);
   }
 
   async function actualizar(id, cambios) {
@@ -1116,6 +1197,7 @@
     crear: crear,
     guardarArchivosRequerimiento: guardarArchivosRequerimiento,
     obtenerArchivosRequerimiento: obtenerArchivosRequerimiento,
+    obtenerDocumentosRequerimiento: obtenerDocumentosRequerimiento,
     actualizar: actualizar,
     eliminar: eliminar,
     obtenerBitacora: obtenerBitacora,

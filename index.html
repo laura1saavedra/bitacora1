@@ -6,7 +6,7 @@
   <meta name="description" content="Bit&#225;cora de requerimientos de Apps Colombia integrada con SharePoint Online.">
   <title>Bit&#225;cora | Backlog Apps Colombia</title>
   <link rel="stylesheet"
-    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260728.10" />
+    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260729.22" />
 </head>
 <body>
   <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
@@ -174,6 +174,8 @@
             <select class="fake-select filter-placeholder" id="filtro-extra" aria-label="Filtro adicional">
               <option value="">M&#225;s filtros</option>
             </select>
+            <input type="date" class="fake-select" id="filtro-fecha"
+              aria-label="Filtrar por fecha de solicitud" title="Filtrar por fecha de solicitud">
             <button class="btn-link danger-link" id="btn-limpiar-filtros" type="button">&#215; Limpiar filtros</button>
             <button class="btn-export" id="btn-exportar" type="button">&#x21E9; Exportar CSV</button>
           </div>
@@ -315,8 +317,10 @@
               <div class="form-group full">
                 <label for="archivosAdjuntos">Archivos adjuntos</label>
                 <div class="file-field">
-                  <input type="file" id="archivosAdjuntos" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
-                  <span>PDF, Word, Excel o im&#225;genes. M&#225;ximo 10 archivos de 20 MB cada uno.</span>
+                  <input type="file" id="archivosAdjuntos" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip">
+                  <span>PDF, Word, Excel, im&#225;genes o ZIP. M&#225;ximo 10 archivos de 20 MB cada uno.</span>
+                  <span>Si adjuntas un archivo, debes seleccionar obligatoriamente su tipo documental.</span>
+                  <span id="resumenArchivos" class="file-selection-summary" aria-live="polite">No hay archivos agregados.</span>
                 </div>
                 <div id="clasificacionArchivos" class="file-category-list" aria-live="polite" hidden></div>
               </div>
@@ -445,9 +449,6 @@
           <button class="modal-close" id="modal-cerrar" type="button" aria-label="Cerrar detalle">&#215;</button>
         </header>
         <div class="modal-body" id="modal-contenido"></div>
-        <footer class="modal-footer">
-          <button class="btn-secondary" id="modal-cerrar-btn" type="button">Cerrar</button>
-        </footer>
       </section>
     </div>
 
@@ -475,8 +476,8 @@
     </div>
   </div>
 
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260728.6"></script>
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260728.4"></script>
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260728.10"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260729.10"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260729.10"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260729.18"></script>
 </body>
 </html>

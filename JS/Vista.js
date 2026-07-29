@@ -19,6 +19,14 @@
     '<svg viewBox="0 0 24 24" aria-hidden="true">' +
     '<path d="m4 20 4.3-1.1L19 8.2 15.8 5 5.1 15.7 4 20Z"></path>' +
     '<path d="m14.5 6.3 3.2 3.2"></path></svg>';
+  const ICONO_DESCARGA =
+    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path d="M12 3v12"></path>' +
+    '<path d="m7 10 5 5 5-5"></path>' +
+    '<path d="M5 20h14"></path></svg>';
+  const ADJUNTOS_POR_PAGINA = 4;
+  let archivosAdjuntosDetalle = [];
+  let paginaAdjuntosDetalle = 1;
 
   function textoSeguro(valor) {
     return String(valor == null ? "" : valor)
@@ -353,6 +361,247 @@
       .join("");
   }
 
+  function fechaArchivo(valor) {
+    if (!valor) {
+      return "\u2014";
+    }
+    const fecha = new Date(valor);
+    return isNaN(fecha.getTime())
+      ? valor
+      : fecha.toLocaleString("es-CO", {
+          dateStyle: "short",
+          timeStyle: "short"
+        });
+  }
+
+  function urlDescargaArchivo(url) {
+    const valor = String(url || "");
+    return valor + (valor.indexOf("?") === -1 ? "?" : "&") + "download=1";
+  }
+
+  function urlVistaPreviaArchivo(url) {
+    const valor = String(url || "");
+    return valor + (valor.indexOf("?") === -1 ? "?" : "&") + "web=1";
+  }
+
+  function renderizarBibliotecaAdjuntos(archivos) {
+    if (!archivos.length) {
+      return (
+        '<div id="biblioteca-adjuntos">' +
+        '<span class="detail-empty">Sin archivos adjuntos</span>' +
+        "</div>"
+      );
+    }
+
+    const archivosOrdenados = archivos
+      .slice()
+      .sort(function (a, b) {
+        const carpetaA = a.tipoDocumento || "Sin clasificaci\u00f3n";
+        const carpetaB = b.tipoDocumento || "Sin clasificaci\u00f3n";
+        return (
+          carpetaA.localeCompare(carpetaB, "es") ||
+          String(a.nombre || "").localeCompare(
+            String(b.nombre || ""),
+            "es"
+          )
+        );
+      });
+    const totalArchivos = archivosOrdenados.length;
+    const totalPaginas = Math.max(
+      1,
+      Math.ceil(totalArchivos / ADJUNTOS_POR_PAGINA)
+    );
+    paginaAdjuntosDetalle = Math.min(
+      Math.max(1, paginaAdjuntosDetalle),
+      totalPaginas
+    );
+    const inicio =
+      (paginaAdjuntosDetalle - 1) * ADJUNTOS_POR_PAGINA;
+    const fin = Math.min(
+      inicio + ADJUNTOS_POR_PAGINA,
+      totalArchivos
+    );
+
+    const filas = archivosOrdenados
+      .slice(inicio, fin)
+      .map(function (archivo) {
+        const carpeta =
+          archivo.tipoDocumento || "Sin clasificaci\u00f3n";
+        const nombre = archivo.nombre || "Abrir archivo";
+        const extension = nombre.split(".").pop().toLowerCase();
+        const admiteVistaPrevia = [
+          "pdf",
+          "doc",
+          "docx",
+          "xls",
+          "xlsx",
+          "png",
+          "jpg",
+          "jpeg"
+        ].indexOf(extension) !== -1;
+        const urlVistaPrevia = textoSeguro(
+          urlVistaPreviaArchivo(archivo.url)
+        );
+        const urlDescarga = textoSeguro(
+          urlDescargaArchivo(archivo.url)
+        );
+        const accionVistaPrevia = admiteVistaPrevia
+          ? '<a class="sp-file-action" href="' +
+            urlVistaPrevia +
+            '" target="_blank" rel="noopener noreferrer" title="Visualizar" aria-label="Visualizar ' +
+            textoSeguro(nombre) +
+            ' en otra pestaña">' +
+            ICONO_OJO +
+            "</a>"
+          : '<span class="sp-file-action is-disabled" title="Vista previa no disponible para este formato" aria-label="Vista previa no disponible para ' +
+            textoSeguro(nombre) +
+            '">' +
+            ICONO_OJO +
+            "</span>";
+        const enlaceNombre = admiteVistaPrevia
+          ? '<a class="sp-file-name-link" href="' +
+            urlVistaPrevia +
+            '" target="_blank" rel="noopener noreferrer">' +
+            textoSeguro(nombre) +
+            "</a>"
+          : '<span class="sp-file-name-no-preview">' +
+            textoSeguro(nombre) +
+            "</span>";
+        return (
+          '<div class="sp-library-row sp-file-row" role="row">' +
+          '<span class="sp-file-icon" aria-hidden="true"></span>' +
+          '<span class="sp-library-name">' +
+          enlaceNombre +
+          "</span>" +
+          '<span class="sp-library-meta">' +
+          textoSeguro(fechaArchivo(archivo.modificado)) +
+          "</span>" +
+          '<span class="sp-library-type"><span class="sp-folder-label">' +
+          textoSeguro(carpeta) +
+          "</span></span>" +
+          '<span class="sp-file-actions">' +
+          accionVistaPrevia +
+          '<a class="sp-file-action" href="' +
+          urlDescarga +
+          '" download title="Descargar" aria-label="Descargar ' +
+          textoSeguro(nombre) +
+          '">' +
+          ICONO_DESCARGA +
+          "</a>" +
+          "</span>" +
+          "</div>"
+        );
+      })
+      .join("");
+    const botonesPagina = Array.from(
+      { length: totalPaginas },
+      function (_, indice) {
+        const pagina = indice + 1;
+        return (
+          '<button type="button" class="sp-page-button' +
+          (pagina === paginaAdjuntosDetalle ? " is-active" : "") +
+          '" data-pagina-adjuntos="' +
+          pagina +
+          '" aria-label="P\u00e1gina ' +
+          pagina +
+          '"' +
+          (pagina === paginaAdjuntosDetalle
+            ? ' aria-current="page"'
+            : "") +
+          ">" +
+          pagina +
+          "</button>"
+        );
+      }
+    ).join("");
+
+    return (
+      '<div id="biblioteca-adjuntos">' +
+      '<div class="sp-library" role="table" aria-label="Archivos adjuntos">' +
+      '<div class="sp-library-row sp-library-header" role="row">' +
+      '<span aria-hidden="true"></span>' +
+      '<strong class="sp-library-name">Nombre</strong>' +
+      '<strong class="sp-library-meta">Modificado</strong>' +
+      '<strong class="sp-library-type">Carpeta</strong>' +
+      '<strong class="sp-file-actions-header">Acciones</strong>' +
+      "</div>" +
+      filas +
+      "</div>" +
+      '<footer class="sp-library-pagination">' +
+      '<span>Mostrando ' +
+      (inicio + 1) +
+      "\u2013" +
+      fin +
+      " de " +
+      totalArchivos +
+      "</span>" +
+      '<div class="sp-pagination-controls">' +
+      '<button type="button" class="sp-page-button sp-page-nav" data-pagina-adjuntos="' +
+      (paginaAdjuntosDetalle - 1) +
+      '"' +
+      (paginaAdjuntosDetalle === 1 ? " disabled" : "") +
+      ">Anterior</button>" +
+      botonesPagina +
+      '<button type="button" class="sp-page-button sp-page-nav" data-pagina-adjuntos="' +
+      (paginaAdjuntosDetalle + 1) +
+      '"' +
+      (paginaAdjuntosDetalle === totalPaginas ? " disabled" : "") +
+      ">Siguiente</button>" +
+      "</div>" +
+      "</footer>" +
+      "</div>"
+    );
+  }
+
+  function cambiarPaginaAdjuntos(pagina) {
+    const destino = Number(pagina);
+    const totalPaginas = Math.max(
+      1,
+      Math.ceil(
+        archivosAdjuntosDetalle.length / ADJUNTOS_POR_PAGINA
+      )
+    );
+    if (
+      !Number.isInteger(destino) ||
+      destino < 1 ||
+      destino > totalPaginas ||
+      destino === paginaAdjuntosDetalle
+    ) {
+      return;
+    }
+    paginaAdjuntosDetalle = destino;
+    const contenedor = document.getElementById(
+      "biblioteca-adjuntos"
+    );
+    if (contenedor) {
+      contenedor.outerHTML = renderizarBibliotecaAdjuntos(
+        archivosAdjuntosDetalle
+      );
+    }
+  }
+
+  function renderizarCargaAdjuntos() {
+    return (
+      '<section class="detail-upload-panel" aria-labelledby="titulo-agregar-adjuntos">' +
+      '<div class="detail-upload-heading">' +
+      '<div><strong id="titulo-agregar-adjuntos">Agregar archivos</strong>' +
+      "<p>Selecciona uno o varios archivos y asigna su tipo documental.</p></div>" +
+      '<label class="detail-file-picker" for="detalle-archivos-nuevos">' +
+      '<span>Elegir archivos</span>' +
+      '<input type="file" id="detalle-archivos-nuevos" multiple ' +
+      'accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip">' +
+      "</label>" +
+      "</div>" +
+      '<p class="detail-upload-help">PDF, Word, Excel, im\u00e1genes o ZIP. M\u00e1ximo 10 archivos de 20 MB cada uno.</p>' +
+      '<p id="detalle-resumen-archivos" class="detail-upload-summary" aria-live="polite">No hay archivos agregados.</p>' +
+      '<div id="detalle-clasificacion-archivos" class="file-category-list" aria-live="polite" hidden></div>' +
+      '<div class="detail-upload-actions">' +
+      '<button class="btn-primary" id="detalle-subir-archivos" type="button" disabled>Subir archivos</button>' +
+      "</div>" +
+      "</section>"
+    );
+  }
+
   function mostrarDetalle(req) {
     const overlay = document.getElementById("modal-detalle");
     const contenido = document.getElementById("modal-contenido");
@@ -378,21 +627,10 @@
     const archivos = Array.isArray(req.archivosAdjuntos)
       ? req.archivosAdjuntos
       : [];
-    const listaArchivos = archivos.length
-      ? '<ul class="attachment-list">' +
-        archivos
-          .map(function (archivo) {
-            return (
-              '<li><a href="' +
-              textoSeguro(archivo.url) +
-              '" target="_blank" rel="noopener noreferrer">' +
-              textoSeguro(archivo.nombre || "Abrir archivo") +
-              "</a></li>"
-            );
-          })
-          .join("") +
-        "</ul>"
-      : '<span class="detail-empty">Sin archivos adjuntos</span>';
+    archivosAdjuntosDetalle = archivos.slice();
+    paginaAdjuntosDetalle = 1;
+    const listaArchivos = renderizarBibliotecaAdjuntos(archivos);
+    const cargaArchivos = renderizarCargaAdjuntos();
 
     contenido.innerHTML =
       campos
@@ -408,6 +646,7 @@
       .join("") +
       '<div class="detail-row detail-attachments"><strong>Archivos adjuntos:</strong><div>' +
       listaArchivos +
+      cargaArchivos +
       "</div></div>";
     overlay.hidden = false;
   }
@@ -431,6 +670,7 @@
     renderizarFiltros: renderizarFiltros,
     renderizarActividad: renderizarActividad,
     mostrarDetalle: mostrarDetalle,
+    cambiarPaginaAdjuntos: cambiarPaginaAdjuntos,
     cerrarDetalle: cerrarDetalle
   });
 

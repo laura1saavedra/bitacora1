@@ -23,6 +23,11 @@
     "04_Documentaci\u00f3n"
   ];
   let tiposDocumento = TIPOS_DOCUMENTO_PREDETERMINADOS.slice();
+  let archivosSeleccionados = [];
+  const tiposDocumentoSeleccionados = new Map();
+  let requerimientoDetalleActual = null;
+  let archivosDetalleSeleccionados = [];
+  const tiposDocumentoDetalleSeleccionados = new Map();
 
   const SELECTORES_CHROME_SHAREPOINT = [
     "#suiteBar",
@@ -295,7 +300,11 @@
           diagnostico.lista.Title +
           " (" +
           diagnostico.lista.ItemCount +
-          " registros)" +
+          " registros) / " +
+          diagnostico.biblioteca.Title +
+          " (" +
+          diagnostico.biblioteca.ItemCount +
+          " elementos)" +
           (diagnostico.advertencias.length > 0
             ? " - Esquema pendiente de revisar"
             : "")
@@ -307,7 +316,10 @@
         error: error.message,
         urlLista:
           "https://globalhitss.sharepoint.com/sites/AppsColombiaDesarrollo/" +
-          "RetirosDeCesantiasDesarrollo/Lists/Backlog/AllItems.aspx"
+          "RetirosDeCesantiasDesarrollo/Lists/Backlog/AllItems.aspx",
+        urlBiblioteca:
+          "https://globalhitss.sharepoint.com/sites/AppsColombiaDesarrollo/" +
+          "RetirosDeCesantiasDesarrollo/ArchivosRequerimientos/Forms/AllItems.aspx"
       };
       console.error("Validaci\u00f3n de SharePoint:", error);
       Vista.mostrarConexion(false, "Sin conexi\u00f3n: " + error.message);
@@ -334,16 +346,37 @@
     }
   }
 
-  function aplicarFiltros() {
+  function coincideFecha(valorFecha, fechaFiltro) {
+    if (!fechaFiltro) {
+      return true;
+    }
+    if (!valorFecha) {
+      return false;
+    }
+    const fecha = new Date(valorFecha);
+    if (isNaN(fecha.getTime())) {
+      return false;
+    }
+    const fechaLocal =
+      fecha.getFullYear() +
+      "-" +
+      String(fecha.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(fecha.getDate()).padStart(2, "0");
+    return fechaLocal === fechaFiltro;
+  }
+
+  function filtrarRequerimientos() {
     const texto = document.getElementById("buscador").value.toLowerCase();
     const filtros = {
       app: document.getElementById("filtro-app").value,
       responsable: document.getElementById("filtro-responsable").value,
       estado: document.getElementById("filtro-estado").value,
-      prioridad: document.getElementById("filtro-prioridad").value
+      prioridad: document.getElementById("filtro-prioridad").value,
+      fecha: document.getElementById("filtro-fecha").value
     };
 
-    const datos = requerimientos.filter(function (req) {
+    return requerimientos.filter(function (req) {
       const contenido = [
         req.id,
         req.app,
@@ -361,15 +394,85 @@
           req.responsable === filtros.responsable) &&
         (!filtros.estado || req.estado === filtros.estado) &&
         (!filtros.prioridad ||
-          String(req.prioridad) === filtros.prioridad)
+          String(req.prioridad) === filtros.prioridad) &&
+        coincideFecha(req.fechaSolicitud, filtros.fecha)
       );
     });
-    Vista.renderizarTabla(datos);
+  }
+
+  function aplicarFiltros() {
+    Vista.renderizarTabla(filtrarRequerimientos());
+  }
+
+  function escaparCSV(valor) {
+    const texto = String(valor == null ? "" : valor);
+    if (/[";\r\n]/.test(texto)) {
+      return '"' + texto.replace(/"/g, '""') + '"';
+    }
+    return texto;
+  }
+
+  function exportarCSV() {
+    const datos = filtrarRequerimientos();
+    if (!datos.length) {
+      mostrarAlerta({
+        icon: "info",
+        title: "Sin datos para exportar",
+        text: "No hay requerimientos que coincidan con los filtros actuales."
+      });
+      return;
+    }
+
+    const columnas = [
+      ["id", "ID REQ."],
+      ["app", "APP"],
+      ["tipoServicio", "Tipo de servicio"],
+      ["asunto", "Asunto"],
+      ["solicitadoPor", "Solicitado por"],
+      ["responsable", "Responsable"],
+      ["prioridad", "Prioridad"],
+      ["estado", "Estado"],
+      ["fechaSolicitud", "F. solicitud"],
+      ["fechaCierre", "F. cierre"]
+    ];
+    const filas = [columnas.map(function (columna) {
+      return columna[1];
+    })];
+
+    datos.forEach(function (req) {
+      filas.push(columnas.map(function (columna) {
+        return req[columna[0]];
+      }));
+    });
+
+    const csv = filas
+      .map(function (fila) {
+        return fila.map(escaparCSV).join(";");
+      })
+      .join("\r\n");
+    const blob = new Blob(["\ufeff" + csv], {
+      type: "text/csv;charset=utf-8;"
+    });
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement("a");
+    enlace.href = url;
+    enlace.download =
+      "backlog_" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    URL.revokeObjectURL(url);
   }
 
   function limpiarFiltros() {
     document.getElementById("buscador").value = "";
-    ["filtro-app", "filtro-responsable", "filtro-estado", "filtro-prioridad"]
+    [
+      "filtro-app",
+      "filtro-responsable",
+      "filtro-estado",
+      "filtro-prioridad",
+      "filtro-fecha"
+    ]
       .forEach(function (id) {
         document.getElementById(id).value = "";
       });
@@ -387,6 +490,11 @@
         });
         return;
       }
+      req.archivosAdjuntos =
+        await Modelo.obtenerDocumentosRequerimiento(req);
+      requerimientoDetalleActual = req;
+      archivosDetalleSeleccionados = [];
+      tiposDocumentoDetalleSeleccionados.clear();
       Vista.mostrarDetalle(req);
     } catch (error) {
       await mostrarAlerta({
@@ -521,7 +629,6 @@
       Modelo.usuarioActual().nombre;
     document.getElementById("estado").value = "Pendiente";
     document.getElementById("fechaSolicitud").value = fechaActual();
-    document.getElementById("archivosAdjuntos").value = "";
     limpiarClasificacionArchivos();
 
     try {
@@ -586,7 +693,6 @@
         "Actualiza la informaci\u00f3n de tu solicitud.";
       document.getElementById("btn-guardar").textContent = "Guardar cambios";
       document.getElementById("btn-limpiar").hidden = true;
-      document.getElementById("archivosAdjuntos").value = "";
       limpiarClasificacionArchivos();
 
       document.getElementById("id").value = req.id || "";
@@ -628,21 +734,51 @@
   }
 
   function archivosFormulario() {
-    const campo = document.getElementById("archivosAdjuntos");
-    return campo ? Array.from(campo.files || []) : [];
+    return archivosSeleccionados.slice();
+  }
+
+  function claveArchivo(archivo) {
+    return [
+      archivo.name,
+      archivo.size,
+      archivo.lastModified || 0
+    ].join("::");
   }
 
   function limpiarClasificacionArchivos() {
+    archivosSeleccionados = [];
+    tiposDocumentoSeleccionados.clear();
+    const campo = document.getElementById("archivosAdjuntos");
+    if (campo) {
+      campo.value = "";
+    }
     const contenedor = document.getElementById("clasificacionArchivos");
     contenedor.replaceChildren();
     contenedor.hidden = true;
+    actualizarResumenArchivos();
   }
 
-  function crearSelectorTipoDocumento(indice) {
+  function actualizarResumenArchivos() {
+    const resumen = document.getElementById("resumenArchivos");
+    if (!resumen) {
+      return;
+    }
+    const cantidad = archivosSeleccionados.length;
+    resumen.textContent = cantidad
+      ? cantidad +
+        (cantidad === 1
+          ? " archivo seleccionado. Puedes elegir más archivos."
+          : " archivos seleccionados. Puedes elegir más archivos.")
+      : "No hay archivos agregados.";
+  }
+
+  function crearSelectorTipoDocumento(archivo, indice) {
     const selector = document.createElement("select");
     selector.id = "tipoDocumentoArchivo-" + indice;
     selector.dataset.indiceArchivo = String(indice);
     selector.setAttribute("aria-label", "Tipo de documento");
+    selector.setAttribute("aria-required", "true");
+    selector.required = true;
 
     const opcionInicial = document.createElement("option");
     opcionInicial.value = "";
@@ -655,6 +791,15 @@
       opcion.textContent = tipo;
       selector.appendChild(opcion);
     });
+    selector.value =
+      tiposDocumentoSeleccionados.get(claveArchivo(archivo)) || "";
+    selector.addEventListener("change", function () {
+      tiposDocumentoSeleccionados.set(
+        claveArchivo(archivo),
+        selector.value.trim()
+      );
+      selector.removeAttribute("aria-invalid");
+    });
     return selector;
   }
 
@@ -663,6 +808,7 @@
     const contenedor = document.getElementById("clasificacionArchivos");
     contenedor.replaceChildren();
     contenedor.hidden = !archivos.length;
+    actualizarResumenArchivos();
 
     archivos.forEach(function (archivo, indice) {
       const fila = document.createElement("div");
@@ -673,33 +819,293 @@
       nombre.textContent = archivo.name;
       nombre.title = archivo.name;
 
+      const botonEliminar = document.createElement("button");
+      botonEliminar.type = "button";
+      botonEliminar.className = "file-category-remove";
+      botonEliminar.textContent = "\u00d7";
+      botonEliminar.title = "Quitar archivo";
+      botonEliminar.setAttribute(
+        "aria-label",
+        "Quitar el archivo " + archivo.name
+      );
+      botonEliminar.addEventListener("click", function () {
+        tiposDocumentoSeleccionados.delete(claveArchivo(archivo));
+        archivosSeleccionados.splice(indice, 1);
+        renderizarClasificacionArchivos();
+      });
+
       fila.appendChild(nombre);
-      fila.appendChild(crearSelectorTipoDocumento(indice));
+      fila.appendChild(crearSelectorTipoDocumento(archivo, indice));
+      fila.appendChild(botonEliminar);
       contenedor.appendChild(fila);
     });
   }
 
-  function archivosClasificadosFormulario() {
-    const archivos = archivosFormulario();
-    const selectores = Array.from(
-      document.querySelectorAll(
-        "#clasificacionArchivos select[data-indice-archivo]"
-      )
+  async function agregarArchivosSeleccionados(evento) {
+    const nuevosArchivos = Array.from(evento.target.files || []);
+    evento.target.value = "";
+    if (!nuevosArchivos.length) {
+      return;
+    }
+
+    const archivosPorClave = new Map(
+      archivosSeleccionados.map(function (archivo) {
+        return [claveArchivo(archivo), archivo];
+      })
     );
-    const tiposPorIndice = {};
-    selectores.forEach(function (selector) {
-      tiposPorIndice[selector.dataset.indiceArchivo] = selector.value.trim();
+    nuevosArchivos.forEach(function (archivo) {
+      archivosPorClave.set(claveArchivo(archivo), archivo);
     });
 
-    return archivos.map(function (archivo, indice) {
+    if (
+      archivosPorClave.size >
+      Modelo.configuracion.cantidadMaximaArchivos
+    ) {
+      await mostrarAlerta({
+        icon: "warning",
+        title: "Demasiados archivos",
+        text:
+          "Puede adjuntar máximo " +
+          Modelo.configuracion.cantidadMaximaArchivos +
+          " archivos por operación."
+      });
+      return;
+    }
+
+    archivosSeleccionados = Array.from(archivosPorClave.values());
+    renderizarClasificacionArchivos();
+  }
+
+  function archivosClasificadosFormulario() {
+    const archivos = archivosFormulario();
+    return archivos.map(function (archivo) {
       return {
         archivo: archivo,
-        tipoDocumento: tiposPorIndice[String(indice)] || ""
+        tipoDocumento:
+          tiposDocumentoSeleccionados.get(claveArchivo(archivo)) || ""
       };
     });
   }
 
-  function validarArchivos(archivosClasificados) {
+  function actualizarResumenArchivosDetalle() {
+    const resumen = document.getElementById("detalle-resumen-archivos");
+    const boton = document.getElementById("detalle-subir-archivos");
+    const cantidad = archivosDetalleSeleccionados.length;
+    if (resumen) {
+      resumen.textContent = cantidad
+        ? cantidad +
+          (cantidad === 1
+            ? " archivo listo para clasificar y subir."
+            : " archivos listos para clasificar y subir.")
+        : "No hay archivos agregados.";
+    }
+    if (boton) {
+      boton.disabled = cantidad === 0;
+    }
+  }
+
+  function crearSelectorTipoDocumentoDetalle(archivo, indice) {
+    const selector = document.createElement("select");
+    selector.id = "tipoDocumentoDetalle-" + indice;
+    selector.setAttribute("aria-label", "Tipo de documento");
+    selector.setAttribute("aria-required", "true");
+    selector.required = true;
+
+    const opcionInicial = document.createElement("option");
+    opcionInicial.value = "";
+    opcionInicial.textContent = "Seleccione el tipo";
+    selector.appendChild(opcionInicial);
+
+    tiposDocumento.forEach(function (tipo) {
+      const opcion = document.createElement("option");
+      opcion.value = tipo;
+      opcion.textContent = tipo;
+      selector.appendChild(opcion);
+    });
+    selector.value =
+      tiposDocumentoDetalleSeleccionados.get(claveArchivo(archivo)) || "";
+    selector.addEventListener("change", function () {
+      tiposDocumentoDetalleSeleccionados.set(
+        claveArchivo(archivo),
+        selector.value.trim()
+      );
+      selector.removeAttribute("aria-invalid");
+    });
+    return selector;
+  }
+
+  function renderizarClasificacionArchivosDetalle() {
+    const contenedor = document.getElementById(
+      "detalle-clasificacion-archivos"
+    );
+    if (!contenedor) {
+      return;
+    }
+    contenedor.replaceChildren();
+    contenedor.hidden = !archivosDetalleSeleccionados.length;
+    actualizarResumenArchivosDetalle();
+
+    archivosDetalleSeleccionados.forEach(function (archivo, indice) {
+      const fila = document.createElement("div");
+      fila.className = "file-category-row detail-file-category-row";
+
+      const nombre = document.createElement("span");
+      nombre.className = "file-category-name";
+      nombre.textContent = archivo.name;
+      nombre.title = archivo.name;
+
+      const botonEliminar = document.createElement("button");
+      botonEliminar.type = "button";
+      botonEliminar.className = "file-category-remove";
+      botonEliminar.textContent = "\u00d7";
+      botonEliminar.title = "Quitar archivo";
+      botonEliminar.setAttribute(
+        "aria-label",
+        "Quitar el archivo " + archivo.name
+      );
+      botonEliminar.addEventListener("click", function () {
+        tiposDocumentoDetalleSeleccionados.delete(claveArchivo(archivo));
+        archivosDetalleSeleccionados.splice(indice, 1);
+        renderizarClasificacionArchivosDetalle();
+      });
+
+      fila.appendChild(nombre);
+      fila.appendChild(
+        crearSelectorTipoDocumentoDetalle(archivo, indice)
+      );
+      fila.appendChild(botonEliminar);
+      contenedor.appendChild(fila);
+    });
+  }
+
+  async function agregarArchivosDetalle(evento) {
+    const nuevosArchivos = Array.from(evento.target.files || []);
+    evento.target.value = "";
+    if (!nuevosArchivos.length) {
+      return;
+    }
+
+    const archivosPorClave = new Map(
+      archivosDetalleSeleccionados.map(function (archivo) {
+        return [claveArchivo(archivo), archivo];
+      })
+    );
+    nuevosArchivos.forEach(function (archivo) {
+      archivosPorClave.set(claveArchivo(archivo), archivo);
+    });
+
+    if (
+      archivosPorClave.size >
+      Modelo.configuracion.cantidadMaximaArchivos
+    ) {
+      await mostrarAlerta({
+        icon: "warning",
+        title: "Demasiados archivos",
+        text:
+          "Puede adjuntar m\u00e1ximo " +
+          Modelo.configuracion.cantidadMaximaArchivos +
+          " archivos por operaci\u00f3n."
+      });
+      return;
+    }
+
+    archivosDetalleSeleccionados = Array.from(
+      archivosPorClave.values()
+    );
+    renderizarClasificacionArchivosDetalle();
+  }
+
+  function archivosClasificadosDetalle() {
+    return archivosDetalleSeleccionados.map(function (archivo) {
+      return {
+        archivo: archivo,
+        tipoDocumento:
+          tiposDocumentoDetalleSeleccionados.get(
+            claveArchivo(archivo)
+          ) || ""
+      };
+    });
+  }
+
+  async function subirArchivosDesdeDetalle() {
+    if (
+      !requerimientoDetalleActual ||
+      !archivosDetalleSeleccionados.length
+    ) {
+      return;
+    }
+    const boton = document.getElementById("detalle-subir-archivos");
+    const archivosClasificados = archivosClasificadosDetalle();
+    if (boton) {
+      boton.disabled = true;
+    }
+
+    try {
+      validarArchivos(archivosClasificados, "tipoDocumentoDetalle-");
+      const resultado = await Modelo.guardarArchivosRequerimiento(
+        requerimientoDetalleActual,
+        archivosClasificados
+      );
+
+      requerimientoDetalleActual.archivosAdjuntos =
+        await Modelo.obtenerDocumentosRequerimiento(
+          requerimientoDetalleActual
+        );
+      archivosDetalleSeleccionados = [];
+      tiposDocumentoDetalleSeleccionados.clear();
+      Vista.mostrarDetalle(requerimientoDetalleActual);
+
+      if (resultado.errores.length) {
+        await mostrarAlerta({
+          icon: "warning",
+          title: "Algunos archivos no se cargaron",
+          text:
+            "No fue posible cargar: " +
+            resultado.errores
+              .map(function (error) {
+                return error.nombre;
+              })
+              .join(", ") +
+            "."
+        });
+      } else {
+        Modelo.agregarActividad(
+          Modelo.usuarioActual().nombre,
+          "Agreg\u00f3 " +
+            resultado.cargados.length +
+            (resultado.cargados.length === 1
+              ? " archivo al requerimiento "
+              : " archivos al requerimiento ") +
+            requerimientoDetalleActual.id
+        );
+        await mostrarAlerta({
+          icon: "success",
+          title: "Archivos agregados",
+          text:
+            resultado.cargados.length +
+            (resultado.cargados.length === 1
+              ? " archivo fue cargado correctamente."
+              : " archivos fueron cargados correctamente.")
+        });
+      }
+    } catch (error) {
+      await mostrarAlerta({
+        icon: "error",
+        title: "No se pudieron agregar los archivos",
+        text: error.message
+      });
+    } finally {
+      const botonActual = document.getElementById(
+        "detalle-subir-archivos"
+      );
+      if (botonActual) {
+        botonActual.disabled =
+          archivosDetalleSeleccionados.length === 0;
+      }
+    }
+  }
+
+  function validarArchivos(archivosClasificados, prefijoSelector) {
     const extensionesPermitidas = [
       "pdf",
       "doc",
@@ -708,7 +1114,8 @@
       "xlsx",
       "png",
       "jpg",
-      "jpeg"
+      "jpeg",
+      "zip"
     ];
     const configuracion = Modelo.configuracion;
 
@@ -722,9 +1129,16 @@
       );
     }
 
-    archivosClasificados.forEach(function (clasificacion) {
+    archivosClasificados.forEach(function (clasificacion, indice) {
       const archivo = clasificacion.archivo;
       if (!clasificacion.tipoDocumento) {
+        const selector = document.getElementById(
+          (prefijoSelector || "tipoDocumentoArchivo-") + indice
+        );
+        if (selector) {
+          selector.setAttribute("aria-invalid", "true");
+          selector.focus();
+        }
         throw new Error(
           "Seleccione el tipo de documento para " + archivo.name + "."
         );
@@ -1078,13 +1492,22 @@
       .getElementById("btnAgregarPersona")
       .addEventListener("click", agregarPersona);
     document.getElementById("buscador").addEventListener("input", aplicarFiltros);
-    ["filtro-app", "filtro-responsable", "filtro-estado", "filtro-prioridad"]
+    [
+      "filtro-app",
+      "filtro-responsable",
+      "filtro-estado",
+      "filtro-prioridad",
+      "filtro-fecha"
+    ]
       .forEach(function (id) {
         document.getElementById(id).addEventListener("change", aplicarFiltros);
       });
     document
       .getElementById("btn-limpiar-filtros")
       .addEventListener("click", limpiarFiltros);
+    document
+      .getElementById("btn-exportar")
+      .addEventListener("click", exportarCSV);
     document
       .getElementById("btn-actualizar")
       .addEventListener("click", cargarDashboard);
@@ -1110,7 +1533,7 @@
       .addEventListener("click", guardarFormulario);
     document
       .getElementById("archivosAdjuntos")
-      .addEventListener("change", renderizarClasificacionArchivos);
+      .addEventListener("change", agregarArchivosSeleccionados);
     document
       .getElementById("btn-limpiar")
       .addEventListener("click", function (evento) {
@@ -1174,15 +1597,35 @@
 
     const overlay = document.getElementById("modal-detalle");
     const overlayMensaje = document.getElementById("modal-mensaje");
+    const contenidoDetalle = document.getElementById("modal-contenido");
     document
       .getElementById("modal-cerrar")
-      .addEventListener("click", Vista.cerrarDetalle);
-    document
-      .getElementById("modal-cerrar-btn")
       .addEventListener("click", Vista.cerrarDetalle);
     overlay.addEventListener("click", function (evento) {
       if (evento.target === overlay) {
         Vista.cerrarDetalle();
+      }
+    });
+    contenidoDetalle.addEventListener("change", function (evento) {
+      if (evento.target.id === "detalle-archivos-nuevos") {
+        agregarArchivosDetalle(evento);
+      }
+    });
+    contenidoDetalle.addEventListener("click", function (evento) {
+      const botonPagina = evento.target.closest(
+        "[data-pagina-adjuntos]"
+      );
+      if (botonPagina && !botonPagina.disabled) {
+        Vista.cambiarPaginaAdjuntos(
+          Number(botonPagina.dataset.paginaAdjuntos)
+        );
+        return;
+      }
+      const botonSubir = evento.target.closest(
+        "#detalle-subir-archivos"
+      );
+      if (botonSubir) {
+        subirArchivosDesdeDetalle();
       }
     });
     document
