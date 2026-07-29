@@ -39,10 +39,8 @@
             <span class="ico" aria-hidden="true">&#x2699;</span>
             <span>Gesti&#243;n</span>
           </div>
-          <button class="nav-sub" type="button" data-vista="gestion">Asignar responsables</button>
-          <button class="nav-sub" type="button" data-vista="gestion">Asignar mentores</button>
+          <button class="nav-sub" type="button" data-vista="gestion">Gesti&#243;n de Requerimientos</button>
           <button class="nav-sub" type="button" data-vista="gestion">Cambiar estados</button>
-          <button class="nav-sub" type="button" data-vista="gestion">Observaciones</button>
         </div>
 
         <button class="nav-item" type="button">
@@ -455,6 +453,16 @@
           </div>
         </header>
         <section class="panel">
+          <div class="filters" aria-label="Filtros de gesti&#243;n">
+            <label class="search" for="buscador-gestion">
+              <span aria-hidden="true">&#x2315;</span>
+              <input type="search" id="buscador-gestion" placeholder="Buscar por ID, asunto, responsable o mentor">
+            </label>
+            <input type="date" class="fake-select" id="filtro-fecha-gestion"
+              aria-label="Filtrar por fecha estimada de entrega" title="Filtrar por fecha estimada de entrega">
+            <button class="btn-link danger-link" id="btn-limpiar-filtros-gestion" type="button">&#215; Limpiar filtros</button>
+          </div>
+
           <div class="table-scroll">
             <table>
               <thead>
@@ -463,6 +471,8 @@
                   <th scope="col">Asunto</th>
                   <th scope="col">Responsable</th>
                   <th scope="col">Mentor</th>
+                  <th scope="col">Fecha estimada de entrega</th>
+                  <th scope="col">Fecha PAP</th>
                   <th scope="col">Estado</th>
                   <th scope="col">Observaciones</th>
                   <th scope="col">Acciones</th>
@@ -470,11 +480,16 @@
               </thead>
               <tbody id="tabla-gestion">
                 <tr class="empty-row">
-                  <td colspan="7">Consultando requerimientos administrables&#8230;</td>
+                  <td colspan="9">Consultando requerimientos administrables&#8230;</td>
                 </tr>
               </tbody>
             </table>
           </div>
+
+          <footer class="table-footer" id="pie-paginacion-gestion" hidden>
+            <span id="resumen-paginacion-gestion"></span>
+            <nav class="pagination" id="controles-paginacion-gestion" aria-label="Paginaci&#243;n de gesti&#243;n"></nav>
+          </footer>
         </section>
       </section>
     </main>
@@ -521,3 +536,7 @@
   <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260729.18"></script>
 </body>
 </html>
+
+
+
+

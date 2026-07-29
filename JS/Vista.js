@@ -361,7 +361,7 @@ function renderizarTabla(datos, paginacion) {
     renderizarPaginacionMisRequerimientos(paginacion);
   }
 
-  function renderizarGestion(datos) {
+function renderizarGestion(datos, paginacion) {
     const cuerpo = document.getElementById("tabla-gestion");
     cuerpo.innerHTML = datos.length
       ? datos
@@ -370,8 +370,22 @@ function renderizarTabla(datos, paginacion) {
               '<tr data-id="' + textoSeguro(req.id) + '">' +
               '<td data-label="ID req.">' + textoSeguro(req.id) + "</td>" +
               '<td data-label="Asunto">' + textoSeguro(req.asunto) + "</td>" +
-              '<td data-label="Responsable">' + textoSeguro(req.responsable || "No asignado") + "</td>" +
-              '<td data-label="Mentor">' + textoSeguro(req.mentor || "No asignado") + "</td>" +
+              '<td data-label="Responsable"><input class="gestion-responsable" type="text" value="' +
+              textoSeguro(req.responsable) +
+              '" data-original="' +
+              textoSeguro(req.responsable) +
+              '" placeholder="Correo del responsable" aria-label="Responsable del requerimiento ' +
+              textoSeguro(req.id) +
+              '"></td>' +
+              '<td data-label="Mentor"><input class="gestion-mentor" type="text" value="' +
+              textoSeguro(req.mentor) +
+              '" data-original="' +
+              textoSeguro(req.mentor) +
+              '" placeholder="Correo del mentor" aria-label="Mentor del requerimiento ' +
+              textoSeguro(req.id) +
+              '"></td>' +
+              '<td data-label="Fecha estimada de entrega">' + textoSeguro(req.fechaEntrega || "Sin definir") + "</td>" +
+              '<td data-label="Fecha PAP">' + textoSeguro(req.fechaPAP || "Sin definir") + "</td>" +
               '<td data-label="Estado"><select class="gestion-estado">' +
               opcionesEstado(req.estado) +
               "</select></td>" +
@@ -380,13 +394,80 @@ function renderizarTabla(datos, paginacion) {
               '" aria-label="Observaciones del requerimiento ' +
               textoSeguro(req.id) +
               '"></td>' +
-              '<td data-label="Acciones"><button class="action-btn save-btn" data-id="' +
+              '<td data-label="Acciones"><div class="request-action-buttons">' +
+              '<button class="action-btn icon-action view-btn" data-id="' +
               textoSeguro(req.id) +
-              '">Guardar</button></td></tr>'
+              '" type="button" aria-label="Ver requerimiento ' +
+              textoSeguro(req.id) +
+              '" title="Ver detalle">' + ICONO_OJO + "</button>" +
+              '<button class="action-btn save-btn" data-id="' +
+              textoSeguro(req.id) +
+              '">Guardar</button></div></td></tr>'
             );
           })
           .join("")
-      : '<tr class="empty-row"><td colspan="7">No hay requerimientos para gestionar.</td></tr>';
+      : '<tr class="empty-row"><td colspan="9">No hay requerimientos para gestionar.</td></tr>';
+    if (paginacion) {
+      renderizarPaginacionGestion(paginacion);
+    }
+  }
+
+  function renderizarPaginacionGestion(paginacion) {
+    const pie = document.getElementById("pie-paginacion-gestion");
+    const resumen = document.getElementById("resumen-paginacion-gestion");
+    const controles = document.getElementById("controles-paginacion-gestion");
+    const tieneDatos = paginacion && paginacion.total > 0;
+    pie.hidden = !tieneDatos;
+
+    if (!tieneDatos) {
+      resumen.textContent = "";
+      controles.innerHTML = "";
+      return;
+    }
+
+    resumen.textContent =
+      "Mostrando " +
+      paginacion.inicio +
+      "–" +
+      paginacion.fin +
+      " de " +
+      paginacion.total;
+
+    const anterior =
+      '<button type="button" data-pagina="' +
+      (paginacion.pagina - 1) +
+      '" aria-label="Página anterior"' +
+      (paginacion.pagina === 1 ? " disabled" : "") +
+      ">&#8249;</button>";
+    const paginas = paginasPaginacion(
+      paginacion.pagina,
+      paginacion.totalPaginas
+    )
+      .map(function (pagina) {
+        if (pagina === "...") {
+          return '<span class="pagination-ellipsis" aria-hidden="true">…</span>';
+        }
+        const activa = pagina === paginacion.pagina;
+        return (
+          '<button type="button" data-pagina="' +
+          pagina +
+          '" aria-label="Ir a la página ' +
+          pagina +
+          '"' +
+          (activa ? ' class="active" aria-current="page"' : "") +
+          ">" +
+          pagina +
+          "</button>"
+        );
+      })
+      .join("");
+    const siguiente =
+      '<button type="button" data-pagina="' +
+      (paginacion.pagina + 1) +
+      '" aria-label="Página siguiente"' +
+      (paginacion.pagina === paginacion.totalPaginas ? " disabled" : "") +
+      ">&#8250;</button>";
+    controles.innerHTML = anterior + paginas + siguiente;
   }
 
   function opcionesEstado(actual) {

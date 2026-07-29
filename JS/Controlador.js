@@ -16,6 +16,8 @@
   let requerimientosPropios = [];
   let paginaMisRequerimientos = 1;
   let paginaBacklog = 1;
+  let requerimientosGestion = [];
+  let paginaGestion = 1;
   let dialogoMensajeActual = null;
   let focoAntesDelDialogo = null;
   const REQUERIMIENTOS_POR_PAGINA = 5;
@@ -1726,14 +1728,137 @@ async function buscarUsuarios() {
     }
   }
 
+  async function cargarGestion() {
+    try {
+      const todos = await Modelo.obtenerTodos();
+      // Un requerimiento con Responsable Y Observaciones ya diligenciados
+      // se considera gestionado y deja de listarse aqui (sigue existiendo
+      // y visible normalmente en Backlog / Mis requerimientos).
+      requerimientosGestion = todos.filter(function (req) {
+        const tieneResponsable = Boolean(String(req.responsable || "").trim());
+        const tieneObservacion = Boolean(String(req.comentarios || "").trim());
+        return !(tieneResponsable && tieneObservacion);
+      });
+      paginaGestion = 1;
+      renderizarPaginaGestion();
+    } catch (error) {
+      console.error("Carga de gesti\u00f3n:", error);
+      requerimientosGestion = [];
+      paginaGestion = 1;
+      renderizarPaginaGestion();
+    }
+  }
+
+  function filtrarGestion() {
+    const texto = document.getElementById("buscador-gestion").value.toLowerCase();
+    const fecha = document.getElementById("filtro-fecha-gestion").value;
+    return requerimientosGestion.filter(function (req) {
+      const contenido = [req.id, req.asunto, req.responsable, req.mentor]
+        .join(" ")
+        .toLowerCase();
+      return (
+        contenido.indexOf(texto) !== -1 &&
+        coincideFecha(req.fechaEntrega, fecha)
+      );
+    });
+  }
+
+  function renderizarPaginaGestion() {
+    const datosFiltrados = filtrarGestion();
+    const total = datosFiltrados.length;
+    const totalPaginas = Math.max(
+      1,
+      Math.ceil(total / REQUERIMIENTOS_POR_PAGINA)
+    );
+    paginaGestion = Math.min(Math.max(1, paginaGestion), totalPaginas);
+    const indiceInicial = (paginaGestion - 1) * REQUERIMIENTOS_POR_PAGINA;
+    const datosPagina = datosFiltrados.slice(
+      indiceInicial,
+      indiceInicial + REQUERIMIENTOS_POR_PAGINA
+    );
+
+    Vista.renderizarGestion(datosPagina, {
+      pagina: paginaGestion,
+      totalPaginas: totalPaginas,
+      total: total,
+      inicio: total ? indiceInicial + 1 : 0,
+      fin: Math.min(indiceInicial + REQUERIMIENTOS_POR_PAGINA, total)
+    });
+  }
+
+  function cambiarPaginaGestion(pagina) {
+    const destino = Number(pagina);
+    const totalPaginas = Math.max(
+      1,
+      Math.ceil(filtrarGestion().length / REQUERIMIENTOS_POR_PAGINA)
+    );
+    if (
+      !Number.isInteger(destino) ||
+      destino < 1 ||
+      destino > totalPaginas ||
+      destino === paginaGestion
+    ) {
+      return;
+    }
+    paginaGestion = destino;
+    renderizarPaginaGestion();
+  }
+
+  function aplicarFiltrosGestion() {
+    paginaGestion = 1;
+    renderizarPaginaGestion();
+  }
+
+  function limpiarFiltrosGestion() {
+    document.getElementById("buscador-gestion").value = "";
+    document.getElementById("filtro-fecha-gestion").value = "";
+    paginaGestion = 1;
+    renderizarPaginaGestion();
+  }
+
   async function guardarGestion(id, fila) {
     const estado = fila.querySelector(".gestion-estado").value;
     const comentarios = fila.querySelector(".gestion-comentarios").value.trim();
+    const campoResponsable = fila.querySelector(".gestion-responsable");
+    const campoMentor = fila.querySelector(".gestion-mentor");
+    const valorResponsable = campoResponsable.value.trim();
+    const valorMentor = campoMentor.value.trim();
+    const originalResponsable = campoResponsable.dataset.original || "";
+    const originalMentor = campoMentor.dataset.original || "";
+
+    const cambios = {
+      estado: estado,
+      comentarios: comentarios
+    };
+
     try {
-      await Modelo.actualizar(id, {
-        estado: estado,
-        comentarios: comentarios
+      if (valorResponsable !== originalResponsable) {
+        if (!valorResponsable) {
+          cambios.responsable = null;
+        } else {
+          const persona = await Modelo.resolverUsuarioPorCorreo(valorResponsable);
+          cambios.responsable = persona.id;
+        }
+      }
+      if (valorMentor !== originalMentor) {
+        if (!valorMentor) {
+          cambios.mentor = null;
+        } else {
+          const persona = await Modelo.resolverUsuarioPorCorreo(valorMentor);
+          cambios.mentor = persona.id;
+        }
+      }
+    } catch (error) {
+      await mostrarAlerta({
+        icon: "error",
+        title: "No se pudo asignar la persona",
+        text: error.message
       });
+      return;
+    }
+
+    try {
+      await Modelo.actualizar(id, cambios);
       Modelo.agregarActividad(
         Modelo.usuarioActual().nombre,
         "Actualiz\u00f3 el requerimiento " + id
@@ -1883,14 +2008,38 @@ if (btnAgregarPersona) {
           cambiarPaginaBacklog(boton.dataset.pagina);
         }
       });
-    document
+document
       .getElementById("tabla-gestion")
       .addEventListener("click", function (evento) {
-        const boton = evento.target.closest(".save-btn");
-        if (boton) {
-          guardarGestion(boton.dataset.id, boton.closest("tr"));
+        const botonGuardar = evento.target.closest(".save-btn");
+        if (botonGuardar) {
+          guardarGestion(botonGuardar.dataset.id, botonGuardar.closest("tr"));
+          return;
+        }
+        const botonVer = evento.target.closest(".view-btn");
+        if (botonVer) {
+          verRequerimiento(botonVer.dataset.id);
         }
       });
+
+    document
+      .getElementById("buscador-gestion")
+      .addEventListener("input", aplicarFiltrosGestion);
+    document
+      .getElementById("filtro-fecha-gestion")
+      .addEventListener("change", aplicarFiltrosGestion);
+    document
+      .getElementById("btn-limpiar-filtros-gestion")
+      .addEventListener("click", limpiarFiltrosGestion);
+    document
+      .getElementById("controles-paginacion-gestion")
+      .addEventListener("click", function (evento) {
+        const boton = evento.target.closest("button[data-pagina]");
+        if (boton && !boton.disabled) {
+          cambiarPaginaGestion(boton.dataset.pagina);
+        }
+      });
+
 
     const overlay = document.getElementById("modal-detalle");
     const overlayMensaje = document.getElementById("modal-mensaje");
@@ -2053,7 +2202,8 @@ if (resultadosUsuarios) {
     cargarMisRequerimientos: cargarMisRequerimientos,
     cambiarPaginaMisRequerimientos: cambiarPaginaMisRequerimientos,
     cambiarPaginaBacklog: cambiarPaginaBacklog,
-    cargarGestion: cargarGestion
+    cargarGestion: cargarGestion,
+    cambiarPaginaGestion: cambiarPaginaGestion
   });
 
   global.cargarDatosDashboard = cargarDashboard;

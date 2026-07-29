@@ -416,6 +416,10 @@
       }
 
       if (campo.tipo.indexOf("User") === 0) {
+        if (item[clave] === null) {
+          resultado[campo.nombreInterno + "Id"] = null;
+          return;
+        }
         const idUsuario =
           clave === "solicitadoPor" &&
           global._spPageContextInfo &&
@@ -429,6 +433,7 @@
         }
         return;
       }
+
 
       if (campo.tipo.indexOf("Lookup") === 0) {
         const idBusqueda = Number(item[clave]);
@@ -528,7 +533,39 @@
     const datos = await respuesta.json();
     return datos.d.GetContextWebInformation.FormDigestValue;
   }
-
+  async function resolverUsuarioPorCorreo(correo) {
+    const correoNormalizado = String(correo || "").trim();
+    if (!correoNormalizado) {
+      return null;
+    }
+    const valorDigest = await digest();
+    const respuesta = await solicitar(
+      urlSitio() + "/_api/web/ensureuser",
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: Object.assign({}, ODATA, {
+          "Content-Type": "application/json;odata=verbose",
+          "X-RequestDigest": valorDigest
+        }),
+        body: JSON.stringify({ logonName: correoNormalizado })
+      }
+    );
+    if (!respuesta.ok) {
+      throw new Error(
+        "No se encontró ningún usuario de SharePoint con el correo \"" +
+        correoNormalizado +
+        "\"."
+      );
+    }
+    const datos = await respuesta.json();
+    const usuario = datos.d || datos;
+    return {
+      id: usuario.Id,
+      nombre: usuario.Title,
+      correo: usuario.Email || correoNormalizado
+    };
+  }
   async function obtenerTipoEntidad() {
     if (tipoEntidadLista) {
       return tipoEntidadLista;
@@ -1306,6 +1343,7 @@ async function buscarUsuariosMicrosoft(texto) {
     obtenerDocumentosRequerimiento: obtenerDocumentosRequerimiento,
     buscarUsuariosMicrosoft: buscarUsuariosMicrosoft,
     actualizar: actualizar,
+    resolverUsuarioPorCorreo: resolverUsuarioPorCorreo,
     eliminar: eliminar,
     obtenerBitacora: obtenerBitacora,
     agregarActividad: agregarActividad,
