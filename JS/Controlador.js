@@ -358,7 +358,25 @@
     if (!valorFecha) {
       return false;
     }
-    const fecha = new Date(valorFecha);
+
+    const textoFecha = String(valorFecha).trim();
+    const fechaISO = textoFecha.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (fechaISO) {
+      return (
+        fechaISO[1] + "-" + fechaISO[2] + "-" + fechaISO[3] ===
+        fechaFiltro
+      );
+    }
+
+    const fechaLatina = textoFecha.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (fechaLatina) {
+      return (
+        fechaLatina[3] + "-" + fechaLatina[2] + "-" + fechaLatina[1] ===
+        fechaFiltro
+      );
+    }
+
+    const fecha = new Date(textoFecha);
     if (isNaN(fecha.getTime())) {
       return false;
     }
@@ -504,7 +522,10 @@
 
     datos.forEach(function (req) {
       filas.push(columnas.map(function (columna) {
-        return req[columna[0]];
+        const valor = req[columna[0]];
+        return columna[0] === "fechaSolicitud" || columna[0] === "fechaCierre"
+          ? Vista.formatearFecha(valor)
+          : valor;
       }));
     });
 
@@ -763,7 +784,7 @@
       document.getElementById("solicitadoPor").value = req.solicitadoPor || "";
       document.getElementById("estado").value = req.estado || "";
       document.getElementById("fechaSolicitud").value =
-        req.fechaSolicitud || "";
+        Vista.formatearFecha(req.fechaSolicitud);
 
       Vista.mostrarFormularioEdicion();
     } catch (error) {
@@ -1591,7 +1612,8 @@ async function buscarUsuarios() {
   }
 
   function renderizarPaginaMisRequerimientos() {
-    const total = requerimientosPropios.length;
+    const datosFiltrados = filtrarMisRequerimientos();
+    const total = datosFiltrados.length;
     const totalPaginas = Math.max(
       1,
       Math.ceil(total / REQUERIMIENTOS_POR_PAGINA)
@@ -1602,7 +1624,7 @@ async function buscarUsuarios() {
     );
     const indiceInicial =
       (paginaMisRequerimientos - 1) * REQUERIMIENTOS_POR_PAGINA;
-    const datosPagina = requerimientosPropios.slice(
+    const datosPagina = datosFiltrados.slice(
       indiceInicial,
       indiceInicial + REQUERIMIENTOS_POR_PAGINA
     );
@@ -1612,15 +1634,55 @@ async function buscarUsuarios() {
       totalPaginas: totalPaginas,
       total: total,
       inicio: total ? indiceInicial + 1 : 0,
-      fin: Math.min(indiceInicial + REQUERIMIENTOS_POR_PAGINA, total)
+      fin: Math.min(indiceInicial + REQUERIMIENTOS_POR_PAGINA, total),
+      filtrosActivos: Boolean(
+        document.getElementById("buscador-mis-requerimientos").value.trim() ||
+        document.getElementById("filtro-app-mis").value ||
+        document.getElementById("filtro-estado-mis").value ||
+        document.getElementById("filtro-fecha-mis").value
+      )
     });
+  }
+
+  function filtrarMisRequerimientos() {
+    const buscador = document.getElementById("buscador-mis-requerimientos");
+    const texto = buscador ? buscador.value.trim().toLowerCase() : "";
+    const app = document.getElementById("filtro-app-mis").value;
+    const estado = document.getElementById("filtro-estado-mis").value;
+    const fecha = document.getElementById("filtro-fecha-mis").value;
+
+    return requerimientosPropios.filter(function (req) {
+      const contenido = [
+        req.id,
+        req.app,
+        req.tipoServicio,
+        req.asunto,
+        req.descripcion,
+        req.solicitadoPor,
+        req.responsable,
+        req.estado
+      ]
+        .join(" ")
+        .toLowerCase();
+      return (
+        contenido.indexOf(texto) !== -1 &&
+        (!app || req.app === app) &&
+        (!estado || req.estado === estado) &&
+        coincideFecha(req.fechaSolicitud, fecha)
+      );
+    });
+  }
+
+  function buscarMisRequerimientos() {
+    paginaMisRequerimientos = 1;
+    renderizarPaginaMisRequerimientos();
   }
 
   function cambiarPaginaMisRequerimientos(pagina) {
     const destino = Number(pagina);
     const totalPaginas = Math.max(
       1,
-      Math.ceil(requerimientosPropios.length / REQUERIMIENTOS_POR_PAGINA)
+      Math.ceil(filtrarMisRequerimientos().length / REQUERIMIENTOS_POR_PAGINA)
     );
     if (
       !Number.isInteger(destino) ||
@@ -1643,11 +1705,13 @@ async function buscarUsuarios() {
       requerimientosPropios = datos.filter(function (req) {
         return esRequerimientoPropio(req);
       });
+      Vista.renderizarFiltrosMisRequerimientos(requerimientosPropios);
       paginaMisRequerimientos = 1;
       renderizarPaginaMisRequerimientos();
     } catch (error) {
       console.error("Carga de requerimientos personales:", error);
       requerimientosPropios = [];
+      Vista.renderizarFiltrosMisRequerimientos([]);
       paginaMisRequerimientos = 1;
       renderizarPaginaMisRequerimientos();
     }
@@ -1707,6 +1771,15 @@ if (btnAgregarPersona) {
 
 }
     document.getElementById("buscador").addEventListener("input", aplicarFiltros);
+    document
+      .getElementById("buscador-mis-requerimientos")
+      .addEventListener("input", buscarMisRequerimientos);
+    ["filtro-app-mis", "filtro-estado-mis", "filtro-fecha-mis"]
+      .forEach(function (id) {
+        document
+          .getElementById(id)
+          .addEventListener("change", buscarMisRequerimientos);
+      });
     [
       "filtro-app",
       "filtro-responsable",

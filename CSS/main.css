@@ -641,6 +641,16 @@ body {
   font-size: 12px;
 }
 
+#bitacora-app .search input,
+#bitacora-app .search input:hover,
+#bitacora-app .search input:focus,
+#bitacora-app .search input:focus-visible {
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 .filters select {
   min-height: 38px;
   padding: 0 30px 0 10px;

@@ -37,6 +37,33 @@
       .replace(/'/g, "&#039;");
   }
 
+  function formatearFecha(valor) {
+    if (!valor) {
+      return "";
+    }
+
+    const texto = String(valor).trim();
+    const fechaISO = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (fechaISO) {
+      return fechaISO[3] + "/" + fechaISO[2] + "/" + fechaISO[1];
+    }
+
+    const fechaLatina = texto.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (fechaLatina) {
+      return texto;
+    }
+
+    const fecha = new Date(texto);
+    if (isNaN(fecha.getTime())) {
+      return texto;
+    }
+    return String(fecha.getUTCDate()).padStart(2, "0") +
+      "/" +
+      String(fecha.getUTCMonth() + 1).padStart(2, "0") +
+      "/" +
+      fecha.getUTCFullYear();
+  }
+
   function mostrarVista(nombre) {
     Object.keys(VISTAS).forEach(function (clave) {
       const elemento = document.getElementById(VISTAS[clave]);
@@ -135,8 +162,12 @@ function renderizarTabla(datos, paginacion) {
               '<td data-label="Responsable">' + textoSeguro(req.responsable || "No asignado") + "</td>" +
               '<td data-label="Prioridad">' + textoSeguro(req.prioridad) + "</td>" +
               '<td data-label="Estado">' + textoSeguro(req.estado) + "</td>" +
-              '<td data-label="F. solicitud">' + textoSeguro(req.fechaSolicitud) + "</td>" +
-              '<td data-label="F. cierre">' + textoSeguro(req.fechaCierre || "Sin definir") + "</td>" +
+              '<td data-label="F. solicitud">' +
+              textoSeguro(formatearFecha(req.fechaSolicitud) || "Sin definir") +
+              "</td>" +
+              '<td data-label="F. cierre">' +
+              textoSeguro(formatearFecha(req.fechaCierre) || "Sin definir") +
+              "</td>" +
               '<td data-label="Acciones">' +
               '<button class="action-btn view-btn" data-id="' +
               textoSeguro(req.id) +
@@ -322,7 +353,11 @@ function renderizarTabla(datos, paginacion) {
             );
           })
           .join("")
-      : '<tr class="empty-row"><td colspan="9">No tienes requerimientos registrados.</td></tr>';
+      : '<tr class="empty-row"><td colspan="9">' +
+        (paginacion && paginacion.filtrosActivos
+          ? "No hay requerimientos que coincidan con los filtros."
+          : "No tienes requerimientos registrados.") +
+        "</td></tr>";
     renderizarPaginacionMisRequerimientos(paginacion);
   }
 
@@ -407,6 +442,40 @@ function renderizarTabla(datos, paginacion) {
             );
           })
           .join("");
+    });
+  }
+
+  function renderizarFiltrosMisRequerimientos(datos) {
+    [
+      ["filtro-app-mis", "app", "Todas las APP"],
+      ["filtro-estado-mis", "estado", "Todos los estados"]
+    ].forEach(function (configuracion) {
+      const select = document.getElementById(configuracion[0]);
+      const valorActual = select.value;
+      const valores = datos
+        .map(function (item) {
+          return item[configuracion[1]];
+        })
+        .filter(Boolean)
+        .filter(function (valor, indice, arreglo) {
+          return arreglo.indexOf(valor) === indice;
+        });
+      select.innerHTML =
+        '<option value="">' + configuracion[2] + "</option>" +
+        valores
+          .map(function (valor) {
+            return (
+              '<option value="' +
+              textoSeguro(valor) +
+              '">' +
+              textoSeguro(valor) +
+              "</option>"
+            );
+          })
+          .join("");
+      if (valores.indexOf(valorActual) !== -1) {
+        select.value = valorActual;
+      }
     });
   }
 
@@ -681,11 +750,11 @@ function renderizarTabla(datos, paginacion) {
       ["Mentor", req.mentor || "No asignado"],
       ["Estado", req.estado],
       ["Prioridad", req.prioridad],
-      ["Fecha de solicitud", req.fechaSolicitud],
-      ["F.E Entrega", req.fechaEntrega || "Sin definir"],
+      ["Fecha de solicitud", formatearFecha(req.fechaSolicitud) || "Sin definir"],
+      ["F.E Entrega", formatearFecha(req.fechaEntrega) || "Sin definir"],
       ["Complejidad", req.complejidad || "Sin definir"],
-      ["F.E PAP", req.fechaPAP || "Sin definir"],
-      ["F.E Cierre", req.fechaCierre || "Sin definir"]
+      ["F.E PAP", formatearFecha(req.fechaPAP) || "Sin definir"],
+      ["F.E Cierre", formatearFecha(req.fechaCierre) || "Sin definir"]
     ];
     const archivos = Array.isArray(req.archivosAdjuntos)
       ? req.archivosAdjuntos
@@ -726,11 +795,13 @@ function renderizarTabla(datos, paginacion) {
     mostrarGestion: mostrarGestion,
     mostrarConexion: mostrarConexion,
     mostrarUsuario: mostrarUsuario,
+    formatearFecha: formatearFecha,
     renderizarTarjetas: renderizarTarjetas,
     renderizarTabla: renderizarTabla,
     renderizarMisRequerimientos: renderizarMisRequerimientos,
     renderizarGestion: renderizarGestion,
     renderizarFiltros: renderizarFiltros,
+    renderizarFiltrosMisRequerimientos: renderizarFiltrosMisRequerimientos,
     renderizarActividad: renderizarActividad,
     mostrarDetalle: mostrarDetalle,
     cambiarPaginaAdjuntos: cambiarPaginaAdjuntos,

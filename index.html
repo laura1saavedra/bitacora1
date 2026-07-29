@@ -211,31 +211,6 @@
           </footer>
         </section>
 
-        <!-- <div class="bottom-row">
-          <section class="panel" aria-labelledby="titulo-actividad">
-            <h2 id="titulo-actividad">Actividad reciente</h2>
-            <div id="lista-actividad">
-              <p class="empty-message">La actividad del Backlog aparecer&#225; aqu&#237;.</p>
-            </div>
-            <button class="btn-link see-all" id="ver-toda-actividad" type="button">Ver toda la actividad</button>
-          </section>
-
-          <section class="panel" aria-labelledby="titulo-estados">
-            <h2 id="titulo-estados">Ciclo de atenci&#243;n</h2>
-            <div class="flow" id="flujo-estados">
-              <div class="flow-box"><strong>Pendiente</strong><span>Solicitud registrada</span></div>
-              <span class="flow-arrow" aria-hidden="true">&#8594;</span>
-              <div class="flow-box"><strong>En gesti&#243;n</strong><span>Asignaci&#243;n y atenci&#243;n</span></div>
-              <span class="flow-arrow" aria-hidden="true">&#8594;</span>
-              <div class="flow-box"><strong>En pruebas</strong><span>Validaci&#243;n de soluci&#243;n</span></div>
-              <span class="flow-arrow" aria-hidden="true">&#8594;</span>
-              <div class="flow-box"><strong>Cierre usuario</strong><span>Aprobaci&#243;n del solicitante</span></div>
-              <span class="flow-arrow" aria-hidden="true">&#8594;</span>
-              <div class="flow-box"><strong>Finalizado</strong><span>Requerimiento cerrado</span></div>
-            </div>
-          </section>
-        </div>
-        -->
       </section>
        
 
@@ -405,6 +380,24 @@
           <button class="btn-primary" type="button" data-vista="crear">Crear requerimiento</button>
         </header>
         <section class="panel">
+          <div class="filters" aria-label="Filtros de mis requerimientos">
+            <label class="search" for="buscador-mis-requerimientos">
+              <span aria-hidden="true">&#x2315;</span>
+              <input type="search" id="buscador-mis-requerimientos"
+                placeholder="Buscar por ID, APP, asunto o responsable">
+            </label>
+            <select class="fake-select" id="filtro-app-mis"
+              aria-label="Filtrar mis requerimientos por aplicaci&#243;n">
+              <option value="">Todas las APP</option>
+            </select>
+            <select class="fake-select" id="filtro-estado-mis"
+              aria-label="Filtrar mis requerimientos por estado">
+              <option value="">Todos los estados</option>
+            </select>
+            <input type="date" class="fake-select" id="filtro-fecha-mis"
+              aria-label="Filtrar mis requerimientos por fecha de solicitud"
+              title="Filtrar por fecha de solicitud">
+          </div>
           <div class="table-scroll">
             <table class="my-requests-table">
               <thead>
@@ -433,6 +426,23 @@
             <nav class="pagination" id="controles-paginacion-mis"
               aria-label="Paginaci&#243;n de mis requerimientos"></nav>
           </footer>
+        </section>
+
+        <section class="panel" aria-labelledby="titulo-ciclo-atencion">
+          <h2 id="titulo-ciclo-atencion">Ciclo de atenci&#243;n</h2>
+          <div class="flow" id="flujo-estados">
+            <div class="flow-box"><strong>Pendiente</strong><span>Solicitud registrada</span></div>
+            <span class="flow-arrow" aria-hidden="true">&#8594;</span>
+            <div class="flow-box"><strong>En proceso</strong><span>Asignaci&#243;n y atenci&#243;n</span></div>
+            <span class="flow-arrow" aria-hidden="true">&#8594;</span>
+            <div class="flow-box"><strong>En pruebas</strong><span>Validaci&#243;n de la soluci&#243;n</span></div>
+            <span class="flow-arrow" aria-hidden="true">&#8594;</span>
+            <div class="flow-box"><strong>Esperando documentaci&#243;n</strong><span>Documentaci&#243;n del usuario</span></div>
+            <span class="flow-arrow" aria-hidden="true">&#8594;</span>
+            <div class="flow-box"><strong>Esperando cierre</strong><span>Aprobaci&#243;n del solicitante</span></div>
+            <span class="flow-arrow" aria-hidden="true">&#8594;</span>
+            <div class="flow-box"><strong>Finalizado</strong><span>Requerimiento cerrado</span></div>
+          </div>
         </section>
       </section>
 
