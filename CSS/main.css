@@ -684,7 +684,40 @@ body {
   border-collapse: collapse;
   font-size: 12px;
 }
+#view-gestion .table-scroll {
+  overflow-x: auto;
+}
 
+#view-gestion .table-scroll table {
+  table-layout: auto;
+  min-width: 1200px;
+}
+
+#view-gestion .table-scroll table td:nth-child(2) {
+  min-width: 160px;
+}
+
+#bitacora-app .gestion-responsable,
+#bitacora-app .gestion-mentor,
+#bitacora-app .gestion-estado,
+#bitacora-app .gestion-comentarios {
+  width: 100%;
+  min-width: 130px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background-color: #fff;
+  color: #44536c;
+  font-size: 12px;
+}
+#view-gestion .table-scroll table th:nth-child(1),
+#view-gestion .table-scroll table td:nth-child(1),
+#view-gestion .table-scroll table td:nth-child(6) {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
 #bitacora-app thead {
   background: #f7f9fc;
 }
@@ -2296,4 +2329,337 @@ html.bitacora-sharepoint-fullscreen #bitacora-app {
   height: 38px;
   padding: 8px 18px;
   border-radius: 10px;
+}
+.barra-item{
+    margin:20px 0;
+}
+
+
+.barra-item span{
+    display:block;
+    margin-bottom:8px;
+    font-weight:600;
+    color:#1b2b4b;
+}
+
+
+.barra{
+    width:100%;
+    height:18px;
+    background:#e9eef7;
+    border-radius:10px;
+    overflow:hidden;
+}
+
+
+.barra-progreso{
+    height:100%;
+    background:#2563eb;
+    border-radius:10px;
+    transition:width .5s ease;
+}
+/* ===================================
+   DASHBOARD INDICADORES
+=================================== */
+
+
+.indicadores-grid{
+
+display:grid;
+
+grid-template-columns:1fr 1fr;
+
+gap:25px;
+
+}
+
+
+
+.grafica-card{
+
+min-height:320px;
+
+}
+
+
+
+.panel-heading h2{
+
+font-size:18px;
+
+margin-bottom:5px;
+
+}
+
+
+
+.panel-heading p{
+
+color:#64748b;
+
+font-size:14px;
+
+}
+
+
+
+.tabla-indicadores{
+
+margin-top:25px;
+
+}
+
+
+
+.tabla-indicadores table{
+
+width:100%;
+
+border-collapse:collapse;
+
+}
+
+
+
+.tabla-indicadores th{
+
+text-align:left;
+
+padding:14px;
+
+background:#f1f5f9;
+
+color:#334155;
+
+}
+
+
+
+.tabla-indicadores td{
+
+padding:14px;
+
+border-bottom:1px solid #e2e8f0;
+
+}
+
+
+
+@media(max-width:900px){
+
+.indicadores-grid{
+
+grid-template-columns:1fr;
+
+}
+
+}
+/* ===================================
+   KPI INDICADORES
+=================================== */
+
+
+.kpi-container{
+
+display:grid;
+
+grid-template-columns:repeat(3,1fr);
+
+gap:20px;
+
+margin:25px 0;
+
+}
+
+
+
+.kpi-card{
+
+background:white;
+
+border-radius:16px;
+
+padding:22px;
+
+box-shadow:0 4px 15px rgba(0,0,0,.08);
+
+border:1px solid #e5e7eb;
+
+}
+
+
+
+.kpi-card span{
+
+display:block;
+
+font-size:14px;
+
+color:#64748b;
+
+margin-bottom:10px;
+
+}
+
+
+
+.kpi-card strong{
+
+font-size:34px;
+
+color:#2563eb;
+
+}
+
+
+
+/* CONTENEDORES GRAFICAS */
+
+
+.dashboard-two-columns{
+
+display:grid;
+
+grid-template-columns:1fr 1fr;
+
+gap:25px;
+
+}
+
+
+
+.grafica-card{
+
+min-height:350px;
+
+}
+
+
+
+.panel{
+
+border-radius:18px;
+
+}
+
+.resumen-operativo{
+
+    margin-top:25px;
+
+    background:white;
+
+    border-radius:18px;
+
+    padding:20px;
+
+    box-shadow:0 8px 25px rgba(0,0,0,.06);
+
+}
+
+@media(max-width:900px){
+
+.kpi-container{
+
+grid-template-columns:1fr;
+
+}
+
+
+.dashboard-two-columns{
+
+grid-template-columns:1fr;
+
+}
+
+}
+/* ==================================
+   AJUSTE GRAFICAS INDICADORES
+================================== */
+
+
+#graficoEstados,
+#graficoResponsables{
+
+    max-height:280px !important;
+
+    width:100% !important;
+
+}
+.grafica-container{
+    height:320px;
+    width:100%;
+}
+/* =====================================
+   TABLA RESUMEN OPERATIVO
+===================================== */
+
+
+.tabla-indicadores{
+
+    width:100%;
+
+    border-collapse:separate;
+
+    border-spacing:0;
+
+    font-size:14px;
+
+}
+
+
+
+.tabla-indicadores thead th{
+
+    background:#f1f5f9;
+
+    color:#475569;
+
+    text-align:left;
+
+    padding:12px;
+
+    font-size:12px;
+
+    text-transform:uppercase;
+
+    letter-spacing:.5px;
+
+}
+
+
+
+.tabla-indicadores tbody td{
+
+    padding:14px 12px;
+
+    border-bottom:1px solid #e5e7eb;
+
+    color:#334155;
+
+}
+
+
+
+.tabla-indicadores tbody tr:hover{
+
+    background:#f8fafc;
+
+}
+
+
+
+.tabla-indicadores tbody td:nth-child(2){
+
+    font-weight:600;
+
+    color:#2563eb;
+
+}
+
+
+
+.tabla-indicadores tbody td:nth-child(3){
+
+    font-weight:600;
+
 }

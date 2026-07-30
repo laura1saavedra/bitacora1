@@ -51,10 +51,10 @@
           <span class="ico" aria-hidden="true">&#x25A7;</span>
           <span>Documentos</span>
         </button>
-        <button class="nav-item admin-only" type="button" data-vista="dashboard">
-          <span class="ico" aria-hidden="true">&#x25A5;</span>
-          <span>Indicadores</span>
-        </button>
+          <button class="nav-item admin-only" type="button" data-vista="indicadores">
+        <span class="ico" aria-hidden="true">&#x25A5;</span>
+        <span>Indicadores</span>
+      </button>
         <button class="nav-item" type="button">
           <span class="ico" aria-hidden="true">&#x25C9;</span>
           <span>Notificaciones</span>
@@ -210,7 +210,143 @@
         </section>
 
       </section>
-       
+       <section id="view-indicadores" hidden>
+
+              <header class="top-row">
+
+              <div>
+
+              <p class="eyebrow">
+              INDICADORES
+              </p>
+
+
+              <h1>
+              Indicadores de flujo de trabajo
+              </h1>
+
+
+              <p class="subtitle">
+              Analisis del estado de requerimientos y carga administrativa.
+              </p>
+              </div>
+              <div class="kpi-container">
+
+
+                      <div class="kpi-card">
+
+                      <span>Total requerimientos</span>
+
+                      <strong id="kpi-total">
+                      0
+                      </strong>
+
+                      </div>
+
+
+
+                      <div class="kpi-card">
+
+                      <span>Pendientes</span>
+
+                      <strong id="kpi-pendientes">
+                      0
+                      </strong>
+
+                      </div>
+
+
+
+                      <div class="kpi-card">
+
+                      <span>Finalizados</span>
+
+                      <strong id="kpi-finalizados">
+                      0
+                      </strong>
+
+                      </div>
+
+
+</div>
+
+</header>
+
+<div class="indicadores-grid dashboard-two-columns">
+
+
+<section class="panel grafica-card">
+
+
+<div class="panel-heading">
+
+<h2>
+Estado de requerimientos
+</h2>
+
+<p>
+Distribución actual del backlog.
+</p>
+
+
+</div>
+
+
+
+<div class="grafica-container">
+    <canvas id="graficoEstados"></canvas>
+</div>
+
+</section>
+
+<section class="panel grafica-card">
+<div class="panel-heading">
+<h2>
+Carga administrativa
+</h2>
+<p>
+Requerimientos asignados por responsable.
+</p>
+</div>
+<canvas id="graficoResponsables"></canvas>
+
+
+</section>
+
+
+
+
+
+
+<section class="panel resumen-operativo">
+
+
+<h2>
+Resumen operativo
+</h2>
+
+
+<table class="tabla-indicadores">
+
+<thead>
+<tr>
+<th>Estado</th>
+<th>Cantidad</th>
+<th>Porcentaje</th>
+</tr>
+</thead>
+
+
+<tbody id="tabla-resumen-indicadores">
+
+</tbody>
+
+</table>
+
+
+</section>
+
+</section>
 
       <section id="view-crear-requerimiento" aria-labelledby="titulo-crear" hidden>
         <header class="top-row">
@@ -520,8 +656,8 @@
                   <th scope="col">Asunto</th>
                   <th scope="col">Responsable</th>
                   <th scope="col">Mentor</th>
-                  <th scope="col">Fecha estimada de entrega</th>
-                  <th scope="col">Fecha PAP</th>
+                  <th scope="col">F. estimada de entrega</th>
+                  <th scope="col">F. PAP</th>
                   <th scope="col">Estado</th>
                   <th scope="col">Observaciones</th>
                   <th scope="col">Acciones</th>
@@ -583,6 +719,7 @@
   <script charset="utf-8" src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260729.24"></script>
   <script charset="utf-8" src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260729.24"></script>
   <script charset="utf-8" src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260729.24"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>
 

@@ -10,7 +10,8 @@
     crear: "view-crear-requerimiento",
     mis: "view-mis-requerimientos",
     gestion: "view-gestion",
-    historial: "view-historial"
+    historial: "view-historial",
+     indicadores: "view-indicadores"
   };
   const ICONO_OJO =
     '<svg viewBox="0 0 24 24" aria-hidden="true">' +
@@ -102,6 +103,19 @@
     mostrarVista("historial");
     global.Controlador.cargarHistorial();
   }
+
+ function mostrarIndicadores(){
+
+    mostrarVista("indicadores");
+
+
+    setTimeout(function(){
+
+        global.Controlador.cargarIndicadores();
+
+    },300);
+
+}
 
   function mostrarConexion(estado, detalle) {
     const indicador = document.getElementById("estado-conexion");
@@ -978,6 +992,7 @@ function renderizarGestion(datos, paginacion) {
     mostrarMisRequerimientos: mostrarMisRequerimientos,
     mostrarGestion: mostrarGestion,
     mostrarHistorial: mostrarHistorial,
+    mostrarIndicadores: mostrarIndicadores,
     mostrarConexion: mostrarConexion,
     mostrarUsuario: mostrarUsuario,
     formatearFecha: formatearFecha,

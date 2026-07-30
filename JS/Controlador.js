@@ -14,6 +14,8 @@
   // Usuarios seleccionados para el campo Solicitado por
   let usuariosSeleccionados = [];
   let requerimientosPropios = [];
+  let indicadoresEstados = [];
+  let indicadoresResponsables = [];
   let paginaMisRequerimientos = 1;
   let paginaBacklog = 1;
   let requerimientosGestion = [];
@@ -375,6 +377,364 @@
       });
     }
   }
+  // ============================================================
+// PROCESAR DATOS DE INDICADORES
+// ============================================================
+
+async function cargarIndicadores(){
+
+    const datos = await Modelo.obtenerDatosIndicadores();
+
+
+   // =======================================
+   // ESTADOS FIJOS DEL FLUJO DE TRABAJO
+    // =======================================
+
+// =======================================
+// ESTADOS FIJOS DEL FLUJO DE TRABAJO
+// =======================================
+
+const estadosFlujo = [
+    "Pendiente",
+    "En pruebas",
+    "Esperando cierre usuario",
+    "Esperando documentación usuario",
+    "Finalizado"
+];
+
+
+// Contar estados reales desde SharePoint
+const conteoEstados = {};
+
+datos.forEach(function(req){
+
+    const estado = req.estado || "Sin estado";
+
+
+    if(!conteoEstados[estado]){
+
+        conteoEstados[estado] = 0;
+
+    }
+
+
+    conteoEstados[estado]++;
+
+});
+
+
+// Crear estructura fija para la gráfica
+
+indicadoresEstados = estadosFlujo.map(function(estado){
+
+    return {
+
+        nombre: estado,
+
+        cantidad: conteoEstados[estado] || 0
+
+    };
+
+});
+    // ==============================
+    // RESPONSABLES
+    // ==============================
+
+    const responsables = {};
+    datos.forEach(function(req){
+
+        const responsable =
+            req.responsable || "No asignado";
+
+
+        if(!responsables[responsable]){
+
+            responsables[responsable] = 0;
+
+        }
+        responsables[responsable]++;
+
+    });
+
+    indicadoresResponsables =
+        Object.keys(responsables).map(function(nombre){
+
+            return {
+
+                nombre:nombre,
+
+                cantidad:responsables[nombre]
+
+            };
+
+        });
+// =====================================
+// ACTUALIZAR TARJETAS KPI
+// =====================================
+
+const total =
+    datos.length;
+
+
+let pendientes = 0;
+let enPruebas = 0;
+
+let finalizados = 0;
+
+
+datos.forEach(function(req){
+
+    if(req.estado === "Pendiente"){
+
+        pendientes++;
+
+    }
+
+
+    if(req.estado === "Finalizado"){
+
+    finalizados++;
+
+}
+
+});
+
+
+
+const kpiTotal =
+    document.getElementById("kpi-total");
+
+
+const kpiPendientes =
+    document.getElementById("kpi-pendientes");
+
+
+const kpiFinalizados =
+    document.getElementById("kpi-Finalizados");
+
+
+
+if(kpiTotal){
+
+    kpiTotal.textContent = total;
+
+}
+
+
+if(kpiPendientes){
+
+    kpiPendientes.textContent = pendientes;
+
+}
+
+if(kpiFinalizados){
+
+    kpiFinalizados.textContent = finalizados;
+
+}
+
+
+
+    console.log(
+        "Estados indicadores:",
+        indicadoresEstados
+    );
+
+
+    console.log(
+        "Responsables indicadores:",
+        indicadoresResponsables
+    );
+renderizarGraficasIndicadores();
+
+renderizarResumenIndicadores();
+}
+
+// ============================================================
+// CREAR GRAFICAS DE INDICADORES
+// ============================================================
+
+function renderizarGraficasIndicadores(){
+
+    const canvasEstados =
+        document.getElementById("graficoEstados");
+
+
+    const canvasResponsables =
+        document.getElementById("graficoResponsables");
+
+
+
+    if(!canvasEstados || !canvasResponsables){
+
+        console.warn(
+            "No existen los canvas de indicadores"
+        );
+
+        return;
+
+    }
+
+
+
+    // ===============================
+    // GRAFICA DE ESTADOS
+    // ===============================
+
+
+    new Chart(canvasEstados, {
+        type: "bar",
+        data: {
+            labels: indicadoresEstados.map(
+                function(item){
+                    return item.nombre;
+                }
+            ),
+
+
+            datasets:[{
+
+                label:"Cantidad de requerimientos",
+
+
+                data: indicadoresEstados.map(
+                    function(item){
+                        return item.cantidad;
+                    }
+                ),
+
+                borderWidth:1
+            }]
+        },
+      options:{
+    responsive:true,
+
+    maintainAspectRatio:false,
+
+    plugins:{
+        legend:{
+            display:false
+        }
+    },
+
+    scales:{
+        x:{
+            ticks:{
+                autoSkip:false,
+                maxRotation:0,
+                minRotation:0,
+                font:{
+                    size:11
+                }
+            }
+        },
+
+        y:{
+            beginAtZero:true,
+            ticks:{
+                precision:0
+            }
+        }
+    }
+}
+    });
+
+
+    // ===============================
+    // GRAFICA RESPONSABLES
+    // ===============================
+
+    new Chart(canvasResponsables, {
+        type:"doughnut",
+        data:{
+            labels:
+            indicadoresResponsables.map(
+                function(item){
+                    return item.nombre;
+
+                }
+            ),
+
+            datasets:[{
+                data:
+                indicadoresResponsables.map(
+                    function(item){
+                        return item.cantidad;
+
+                    }
+                )
+            }]
+
+        },
+        options:{
+            responsive:true,
+            plugins:{
+                legend:{
+                    position:"bottom"
+                }
+            }
+        }
+    });
+
+
+
+}
+   function renderizarResumenIndicadores(){
+
+    const tabla =
+        document.getElementById(
+            "tabla-resumen-indicadores"
+        );
+
+
+    if(!tabla){
+
+        return;
+
+    }
+
+
+    const total =
+        indicadoresEstados.reduce(
+            function(total,item){
+
+                return total + item.cantidad;
+
+            },
+            0
+        );
+
+
+    tabla.innerHTML =
+        indicadoresEstados.map(function(item){
+
+
+            const porcentaje =
+                total > 0
+                ? ((item.cantidad / total) * 100).toFixed(1)
+                : 0;
+
+
+
+            return `
+
+            <tr>
+
+                <td>${item.nombre}</td>
+
+                <td>${item.cantidad}</td>
+
+                <td>${porcentaje}%</td>
+
+
+            </tr>
+
+            `;
+
+
+        }).join("");
+
+}
 
   function coincideFecha(valorFecha, fechaFiltro) {
     if (!fechaFiltro) {
@@ -2102,8 +2462,10 @@ if (btnAgregarPersona) {
           Vista.mostrarGestion();
         } else if (vista === "historial") {
           Vista.mostrarHistorial();
+        } else if (vista === "indicadores") {
+        Vista.mostrarIndicadores();
         } else if (vista === "crear") {
-          Vista.mostrarFormularioCrear();
+        Vista.mostrarFormularioCrear();
         }
       });
     });
@@ -2389,6 +2751,7 @@ if (resultadosUsuarios) {
     configurarVistaSharePoint: configurarVistaSharePoint,
     comprobarConexion: comprobarConexion,
     cargarDashboard: cargarDashboard,
+    cargarIndicadores: cargarIndicadores,
     prepararFormulario: prepararFormulario,
     cargarMisRequerimientos: cargarMisRequerimientos,
     cambiarPaginaMisRequerimientos: cambiarPaginaMisRequerimientos,

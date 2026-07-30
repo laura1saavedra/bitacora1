@@ -1426,6 +1426,30 @@ async function buscarUsuariosMicrosoft(texto) {
     return desdeActividadSharePoint(datos.d);
   }
 
+// ============================================================
+// DATOS PARA INDICADORES
+// ============================================================
+
+async function obtenerDatosIndicadores() {
+
+    const datos = await obtenerTodos();
+
+    return datos.map(function(req){
+
+        return {
+
+            estado: req.estado || "Sin estado",
+
+            responsable:
+                req.responsable || "No asignado"
+
+        };
+
+    });
+
+}
+
+
   global.Modelo = Object.freeze({
     configuracion: CONFIG,
     urlSitio: urlSitio,
@@ -1434,6 +1458,7 @@ async function buscarUsuariosMicrosoft(texto) {
     verificarConexion: verificarConexion,
     obtenerTiposDocumento: obtenerTiposDocumento,
     obtenerTodos: obtenerTodos,
+    obtenerDatosIndicadores: obtenerDatosIndicadores,
     obtenerPorId: obtenerPorId,
     crear: crear,
     guardarArchivosRequerimiento: guardarArchivosRequerimiento,
