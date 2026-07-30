@@ -130,6 +130,20 @@
   }
 
   function rutaCarpetaRequerimiento(requerimiento) {
+    const nombreCarpeta = nombreSeguroCarpeta(requerimiento.id);
+    return (
+      rutaRelativaSitio() +
+      "/" +
+      CONFIG.bibliotecaArchivos +
+      "/" +
+      nombreCarpeta
+    );
+  }
+
+  function rutaCarpetaRequerimientoAnterior(requerimiento) {
+    if (!requerimiento.spItemId) {
+      return "";
+    }
     const nombreCarpeta = nombreSeguroCarpeta(
       requerimiento.id + "_" + requerimiento.spItemId
     );
@@ -1096,8 +1110,7 @@
     });
   }
 
-  async function obtenerArchivosRequerimiento(requerimiento) {
-    const rutaCarpeta = rutaCarpetaRequerimiento(requerimiento);
+  async function obtenerArchivosRutaRequerimiento(rutaCarpeta) {
     const archivos = await obtenerArchivosCarpeta(
       rutaCarpeta,
       "Sin clasificaci\u00f3n"
@@ -1137,6 +1150,32 @@
     );
     archivosPorCategoria.forEach(function (grupo) {
       Array.prototype.push.apply(archivos, grupo);
+    });
+    return archivos;
+  }
+
+  async function obtenerArchivosRequerimiento(requerimiento) {
+    const rutas = [rutaCarpetaRequerimiento(requerimiento)];
+    const rutaAnterior = rutaCarpetaRequerimientoAnterior(requerimiento);
+    if (rutaAnterior && rutas.indexOf(rutaAnterior) === -1) {
+      rutas.push(rutaAnterior);
+    }
+
+    const grupos = await Promise.all(
+      rutas.map(function (rutaCarpeta) {
+        return obtenerArchivosRutaRequerimiento(rutaCarpeta);
+      })
+    );
+    const archivos = [];
+    const urlsAgregadas = {};
+    grupos.forEach(function (grupo) {
+      grupo.forEach(function (archivo) {
+        const clave = archivo.url || archivo.nombre;
+        if (!urlsAgregadas[clave]) {
+          urlsAgregadas[clave] = true;
+          archivos.push(archivo);
+        }
+      });
     });
     return archivos;
   }

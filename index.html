@@ -6,7 +6,7 @@
   <meta name="description" content="Bit&#225;cora de requerimientos de Apps Colombia integrada con SharePoint Online.">
   <title>Bit&#225;cora | Backlog Apps Colombia</title>
   <link rel="stylesheet"
-    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260729.23" />
+    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260729.26" />
 </head>
 <body>
   <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
@@ -30,7 +30,7 @@
         </button>
 
         <button class="nav-item" type="button" data-vista="mis-requerimientos">
-          <span class="ico" aria-hidden="true">&#128203;</span>
+          <span class="ico" aria-hidden="true">&#x2637;&#xFE0E;</span>
           <span>Mis requerimientos</span>
         </button>
 
@@ -46,10 +46,6 @@
         <button class="nav-item" type="button" data-vista="historial">
           <span class="ico" aria-hidden="true">&#x25F4;</span>
           <span>Historial</span>
-        </button>
-        <button class="nav-item" type="button">
-          <span class="ico" aria-hidden="true">&#x25A7;</span>
-          <span>Documentos</span>
         </button>
           <button class="nav-item admin-only" type="button" data-vista="indicadores">
         <span class="ico" aria-hidden="true">&#x25A5;</span>
@@ -102,42 +98,42 @@
         <div class="cards" aria-label="Indicadores de requerimientos">
           <article class="card">
             <div class="icon blue" aria-hidden="true">&#x25A4;</div>
-            <div>
+            <div class="card-content">
               <div class="num" id="total-requerimientos">&#8212;</div>
               <div class="label">Total requerimientos</div>
             </div>
           </article>
           <article class="card">
             <div class="icon orange" aria-hidden="true">&#x25F7;</div>
-            <div>
+            <div class="card-content">
               <div class="num" id="total-pendientes">&#8212;</div>
               <div class="label">Pendientes</div>
             </div>
           </article>
           <article class="card">
             <div class="icon teal" aria-hidden="true">&#x25C8;</div>
-            <div>
+            <div class="card-content">
               <div class="num" id="total-en-pruebas">&#8212;</div>
               <div class="label">Pruebas</div>
             </div>
           </article>
           <article class="card">
             <div class="icon indigo" aria-hidden="true">&#x21E7;</div>
-            <div>
+            <div class="card-content">
               <div class="num" id="total-pruebas">&#8212;</div>
               <div class="label">Esperando documentaci&#243;n usuario</div>
             </div>
           </article>
           <article class="card">
             <div class="icon purple" aria-hidden="true">&#x25CC;</div>
-            <div>
+            <div class="card-content">
               <div class="num" id="total-cierre-usuario">&#8212;</div>
               <div class="label">Esperando cierre usuario</div>
             </div>
           </article>
           <article class="card">
             <div class="icon green" aria-hidden="true">&#x2713;</div>
-            <div>
+            <div class="card-content">
               <div class="num" id="total-finalizados">&#8212;</div>
               <div class="label">Finalizados</div>
             </div>
@@ -601,11 +597,16 @@ Resumen operativo
           </div>
 
           <div class="filters" aria-label="Filtros del historial">
-            <label class="search" for="buscador-historial">
-              <span aria-hidden="true">&#x2315;</span>
-              <input type="search" id="buscador-historial"
-                placeholder="Buscar por usuario, acci&#243;n o requerimiento">
-            </label>
+            <div class="history-search-actions">
+              <label class="search" for="buscador-historial">
+                <span aria-hidden="true">&#x2315;</span>
+                <input type="search" id="buscador-historial"
+                  placeholder="Buscar por usuario, acci&#243;n o requerimiento">
+              </label>
+              <button class="btn-export" id="btn-exportar-historial" type="button">
+                &#x21E9; Exportar CSV
+              </button>
+            </div>
             <select class="fake-select" id="filtro-tipo-historial"
               aria-label="Filtrar historial por tipo de actividad">
               <option value="">Todos los tipos</option>
@@ -617,8 +618,24 @@ Resumen operativo
             </button>
           </div>
 
-          <div class="activity-list" id="lista-actividad" aria-live="polite">
-            <p class="empty-message">Selecciona Historial para consultar la actividad compartida.</p>
+          <div class="table-scroll">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th scope="col">Fecha</th>
+                  <th scope="col">Usuario</th>
+                  <th scope="col">Correo</th>
+                  <th scope="col">Tipo</th>
+                  <th scope="col">Requerimiento</th>
+                  <th scope="col">Actividad</th>
+                </tr>
+              </thead>
+              <tbody id="lista-actividad" aria-live="polite">
+                <tr class="empty-row">
+                  <td colspan="6">Selecciona Historial para consultar la actividad compartida.</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           <footer class="table-footer" id="pie-paginacion-historial" hidden>
@@ -716,10 +733,9 @@ Resumen operativo
     </div>
   </div>
 
-  <script charset="utf-8" src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260729.24"></script>
-  <script charset="utf-8" src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260729.24"></script>
-  <script charset="utf-8" src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260729.24"></script>
+  <script charset="utf-8" src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260729.26"></script>
+  <script charset="utf-8" src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260729.26"></script>
+  <script charset="utf-8" src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260729.28"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>
-

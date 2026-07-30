@@ -599,41 +599,30 @@ function renderizarGestion(datos, paginacion) {
     lista.innerHTML = actividades.length
       ? actividades
           .map(function (item) {
-            const inicial = String(item.usuario || "U")
-              .trim()
-              .charAt(0)
-              .toUpperCase();
-            const referencia = item.requerimiento
-              ? '<span class="activity-reference">Req. ' +
-                textoSeguro(item.requerimiento) +
-                "</span>"
-              : "";
             return (
-              '<article class="activity-item">' +
-              '<div class="dot" aria-hidden="true">' +
-              textoSeguro(inicial) +
-              "</div>" +
-              '<div class="txt"><div class="activity-heading">' +
-              "<strong>" +
-              textoSeguro(item.usuario || "Usuario de SharePoint") +
-              "</strong>" +
-              '<span class="activity-type">' +
-              textoSeguro(item.tipo || "General") +
-              "</span></div>" +
-              '<p class="activity-action">' +
-              textoSeguro(item.accion) +
-              "</p>" +
-              '<div class="meta">' +
+              "<tr>" +
+              '<td data-label="Fecha" class="history-date">' +
               textoSeguro(formatearFechaHora(item.fecha)) +
-              (item.correo
-                ? " &middot; " + textoSeguro(item.correo)
-                : "") +
-              referencia +
-              "</div></div></article>"
+              "</td>" +
+              '<td data-label="Usuario"><strong>' +
+              textoSeguro(item.usuario || "Usuario de SharePoint") +
+              "</strong></td>" +
+              '<td data-label="Correo">' +
+              textoSeguro(item.correo || "No disponible") +
+              "</td>" +
+              '<td data-label="Tipo"><span class="activity-type">' +
+              textoSeguro(item.tipo || "General") +
+              "</span></td>" +
+              '<td data-label="Requerimiento">' +
+              textoSeguro(item.requerimiento || "No aplica") +
+              "</td>" +
+              '<td data-label="Actividad" class="history-action">' +
+              textoSeguro(item.accion) +
+              "</td></tr>"
             );
           })
           .join("")
-      : '<p class="empty-message">No hay actividad que coincida con los filtros.</p>';
+      : '<tr class="empty-row"><td colspan="6">No hay actividad que coincida con los filtros.</td></tr>';
     renderizarPaginacionHistorial(paginacion);
   }
 

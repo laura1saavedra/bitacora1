@@ -25,7 +25,7 @@
   let dialogoMensajeActual = null;
   let focoAntesDelDialogo = null;
   const REQUERIMIENTOS_POR_PAGINA = 5;
-  const ACTIVIDADES_POR_PAGINA = 10;
+  const ACTIVIDADES_POR_PAGINA = 8;
   const TIPOS_DOCUMENTO_PREDETERMINADOS = [
     "01_Historia_Usuario",
     "02_Fuentes",
@@ -2216,11 +2216,106 @@ async function buscarUsuarios() {
     renderizarPaginaHistorial();
   }
 
-  function limpiarFiltrosHistorial() {
+  function restablecerFiltrosHistorial() {
     document.getElementById("buscador-historial").value = "";
     document.getElementById("filtro-tipo-historial").value = "";
     document.getElementById("filtro-fecha-historial").value = "";
+    paginaHistorial = 1;
+  }
+
+  function limpiarFiltrosHistorial() {
+    restablecerFiltrosHistorial();
     aplicarFiltrosHistorial();
+  }
+
+  async function actualizarHistorial() {
+    const boton = document.getElementById("btn-actualizar-historial");
+    restablecerFiltrosHistorial();
+    boton.disabled = true;
+    boton.setAttribute("aria-busy", "true");
+    boton.textContent = "Actualizando\u2026";
+    try {
+      await cargarHistorial();
+    } finally {
+      boton.disabled = false;
+      boton.removeAttribute("aria-busy");
+      boton.textContent = "Actualizar";
+    }
+  }
+
+  async function exportarHistorialCSV() {
+    const datos = filtrarHistorial();
+    if (!datos.length) {
+      await mostrarAlerta({
+        icon: "info",
+        title: "Sin datos para exportar",
+        text: "No hay actividades que coincidan con los filtros actuales."
+      });
+      return;
+    }
+
+    const confirmacion = await mostrarDialogo({
+      icon: "info",
+      title: "Exportar historial CSV",
+      text:
+        "Se descargar\u00e1 un archivo CSV con " +
+        datos.length +
+        (datos.length === 1 ? " actividad" : " actividades") +
+        " seg\u00fan los filtros actuales.",
+      showCancelButton: true,
+      confirmButtonText: "Descargar",
+      cancelButtonText: "Cancelar"
+    });
+    if (!confirmacion.isConfirmed) {
+      return;
+    }
+
+    const columnas = [
+      ["fecha", "Fecha"],
+      ["usuario", "Usuario"],
+      ["correo", "Correo"],
+      ["tipo", "Tipo"],
+      ["requerimiento", "Requerimiento"],
+      ["accion", "Actividad"]
+    ];
+    const filas = [
+      columnas.map(function (columna) {
+        return columna[1];
+      })
+    ];
+
+    datos.forEach(function (actividad) {
+      filas.push(
+        columnas.map(function (columna) {
+          const valor = actividad[columna[0]];
+          if (columna[0] !== "fecha" || !valor) {
+            return valor;
+          }
+          const fecha = new Date(valor);
+          return isNaN(fecha.getTime())
+            ? valor
+            : fecha.toLocaleString("es-CO");
+        })
+      );
+    });
+
+    const csv = filas
+      .map(function (fila) {
+        return fila.map(escaparCSV).join(";");
+      })
+      .join("\r\n");
+    const blob = new Blob(["\ufeff" + csv], {
+      type: "text/csv;charset=utf-8;"
+    });
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement("a");
+    enlace.href = url;
+    enlace.download =
+      "historial_" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    URL.revokeObjectURL(url);
   }
 
   function cambiarPaginaHistorial(pagina) {
@@ -2582,8 +2677,11 @@ document
       .getElementById("btn-limpiar-historial")
       .addEventListener("click", limpiarFiltrosHistorial);
     document
+      .getElementById("btn-exportar-historial")
+      .addEventListener("click", exportarHistorialCSV);
+    document
       .getElementById("btn-actualizar-historial")
-      .addEventListener("click", cargarHistorial);
+      .addEventListener("click", actualizarHistorial);
     document
       .getElementById("controles-paginacion-historial")
       .addEventListener("click", function (evento) {
