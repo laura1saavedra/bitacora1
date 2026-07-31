@@ -1,10 +1,12 @@
 // ============================================================
 // VISTA.JS
-// Navegacion, renderizado y lectura de la interfaz.
+// Navegación, renderizado y lectura de la interfaz.
+// No consulta SharePoint directamente: comunica las acciones al Controlador.
 // ============================================================
 (function (global) {
   "use strict";
 
+  // Relación estable entre las rutas lógicas y sus contenedores del DOM.
   const VISTAS = {
     dashboard: "view-dashboard",
     crear: "view-crear-requerimiento",
@@ -13,6 +15,7 @@
     historial: "view-historial",
      indicadores: "view-indicadores"
   };
+  // SVG en línea para evitar dependencias externas y heredar el color del tema.
   const ICONO_OJO =
     '<svg viewBox="0 0 24 24" aria-hidden="true">' +
     '<path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>' +
@@ -26,11 +29,19 @@
     '<path d="M12 3v12"></path>' +
     '<path d="m7 10 5 5 5-5"></path>' +
     '<path d="M5 20h14"></path></svg>';
+  const ICONO_PAPELERA =
+    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path d="M4 7h16"></path>' +
+    '<path d="M9 7V4h6v3"></path>' +
+    '<path d="m6 7 1 13h10l1-13"></path>' +
+    '<path d="M10 11v5M14 11v5"></path></svg>';
   const ADJUNTOS_POR_PAGINA = 4;
   let archivosAdjuntosDetalle = [];
   let paginaAdjuntosDetalle = 1;
+  let esAdministradorSesion = false;
 
-    function claseEstado(estado) {
+  // Convierte estados funcionales en variantes visuales conocidas por el CSS.
+  function claseEstado(estado) {
     const mapa = {
       "Pendiente": "orange",
       "En proceso": "orange",
@@ -43,6 +54,7 @@
     return mapa[estado] || "neutral";
   }
 
+  // Todo valor dinámico insertado mediante innerHTML debe pasar por esta función.
   function textoSeguro(valor) {
     return String(valor == null ? "" : valor)
       .replace(/&/g, "&amp;")
@@ -79,6 +91,9 @@
       fecha.getUTCFullYear();
   }
 
+  // --------------------------------------------------------------------------
+  // Navegación entre vistas principales
+  // --------------------------------------------------------------------------
   function mostrarVista(nombre) {
     Object.keys(VISTAS).forEach(function (clave) {
       const elemento = document.getElementById(VISTAS[clave]);
@@ -153,6 +168,32 @@
     }
   }
 
+  function configurarAcceso(esAdministrador) {
+    esAdministradorSesion = Boolean(esAdministrador);
+    const rol = document.getElementById("rol-sesion");
+    if (rol) {
+      rol.textContent = esAdministradorSesion
+        ? "Administrador"
+        : "Cliente";
+    }
+  }
+
+  function botonEditar(req) {
+    if (!esAdministradorSesion) {
+      return "";
+    }
+    return (
+      '<button class="action-btn icon-action edit-btn" data-id="' +
+      textoSeguro(req.id) +
+      '" type="button" aria-label="Editar requerimiento ' +
+      textoSeguro(req.id) +
+      '" title="Editar">' + ICONO_LAPIZ + "</button>"
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // Tableros, tablas y paginación
+  // --------------------------------------------------------------------------
   function renderizarTarjetas(datos) {
     const valores = {
       "total-requerimientos": datos.length,
@@ -209,11 +250,7 @@ function renderizarTabla(datos, paginacion) {
               '" type="button" aria-label="Ver requerimiento ' +
               textoSeguro(req.id) +
               '" title="Ver detalle">' + ICONO_OJO + "</button>" +
-              '<button class="action-btn icon-action edit-btn" data-id="' +
-              textoSeguro(req.id) +
-              '" type="button" aria-label="Editar requerimiento ' +
-              textoSeguro(req.id) +
-              '" title="Editar">' + ICONO_LAPIZ + "</button>" +
+              botonEditar(req) +
               "</div></td></tr>"
             );
           })
@@ -384,11 +421,7 @@ function renderizarTabla(datos, paginacion) {
               '" type="button" aria-label="Ver requerimiento ' +
               textoSeguro(req.id) +
               '" title="Ver detalle">' + ICONO_OJO + "</button>" +
-              '<button class="action-btn icon-action edit-btn" data-id="' +
-              textoSeguro(req.id) +
-              '" type="button" aria-label="Editar requerimiento ' +
-              textoSeguro(req.id) +
-              '" title="Editar">' + ICONO_LAPIZ + "</button>" +
+              botonEditar(req) +
               "</div></td></tr>"
             );
           })
@@ -698,6 +731,9 @@ function renderizarGestion(datos, paginacion) {
       ">&#8250;</button>";
   }
 
+  // --------------------------------------------------------------------------
+  // Biblioteca de adjuntos y acciones sobre archivos
+  // --------------------------------------------------------------------------
   function fechaArchivo(valor) {
     if (!valor) {
       return "\u2014";
@@ -917,6 +953,109 @@ function renderizarGestion(datos, paginacion) {
     }
   }
 
+  function renderizarArchivosFormulario(archivos) {
+    const contenedor = document.getElementById(
+      "archivos-existentes-edicion"
+    );
+    if (!contenedor) {
+      return;
+    }
+    const lista = Array.isArray(archivos) ? archivos : [];
+    contenedor.hidden = lista.length === 0;
+    if (!lista.length) {
+      contenedor.innerHTML = "";
+      return;
+    }
+
+    const filas = lista
+      .slice()
+      .sort(function (a, b) {
+        return String(a.nombre || "").localeCompare(
+          String(b.nombre || ""),
+          "es"
+        );
+      })
+      .map(function (archivo) {
+        const nombre = archivo.nombre || "Abrir archivo";
+        const carpeta =
+          archivo.tipoDocumento || "Sin clasificaci\u00f3n";
+        const extension = nombre.split(".").pop().toLowerCase();
+        const admiteVistaPrevia = [
+          "pdf", "doc", "docx", "xls", "xlsx",
+          "png", "jpg", "jpeg"
+        ].indexOf(extension) !== -1;
+        const urlVistaPrevia = textoSeguro(
+          urlVistaPreviaArchivo(archivo.url)
+        );
+        const urlDescarga = textoSeguro(
+          urlDescargaArchivo(archivo.url)
+        );
+        const enlaceNombre = admiteVistaPrevia
+          ? '<a class="sp-file-name-link" href="' +
+            urlVistaPrevia +
+            '" target="_blank" rel="noopener noreferrer">' +
+            textoSeguro(nombre) +
+            "</a>"
+          : '<span class="sp-file-name-no-preview">' +
+            textoSeguro(nombre) +
+            "</span>";
+        const accionVistaPrevia = admiteVistaPrevia
+          ? '<a class="sp-file-action" href="' +
+            urlVistaPrevia +
+            '" target="_blank" rel="noopener noreferrer" title="Visualizar" aria-label="Visualizar ' +
+            textoSeguro(nombre) +
+            '">' + ICONO_OJO + "</a>"
+          : '<span class="sp-file-action is-disabled" title="Vista previa no disponible">' +
+            ICONO_OJO +
+            "</span>";
+
+        return (
+          '<div class="sp-library-row sp-file-row" role="row">' +
+          '<span class="sp-file-icon" aria-hidden="true"></span>' +
+          '<span class="sp-library-name">' + enlaceNombre + "</span>" +
+          '<span class="sp-library-meta">' +
+          textoSeguro(fechaArchivo(archivo.modificado)) +
+          "</span>" +
+          '<span class="sp-library-type"><span class="sp-folder-label">' +
+          textoSeguro(carpeta) +
+          "</span></span>" +
+          '<span class="sp-file-actions">' +
+          accionVistaPrevia +
+          '<a class="sp-file-action" href="' +
+          urlDescarga +
+          '" download title="Descargar" aria-label="Descargar ' +
+          textoSeguro(nombre) +
+          '">' + ICONO_DESCARGA + "</a>" +
+          '<button class="sp-file-action sp-file-delete" type="button" data-eliminar-archivo="' +
+          textoSeguro(archivo.url) +
+          '" data-nombre-archivo="' +
+          textoSeguro(nombre) +
+          '" title="Eliminar" aria-label="Eliminar ' +
+          textoSeguro(nombre) +
+          '">' + ICONO_PAPELERA + "</button>" +
+          "</span></div>"
+        );
+      })
+      .join("");
+
+    contenedor.innerHTML =
+      '<div class="sp-library" role="table" aria-label="Archivos adjuntos existentes">' +
+      '<div class="sp-library-row sp-library-header" role="row">' +
+      '<span aria-hidden="true"></span>' +
+      '<strong class="sp-library-name">Nombre</strong>' +
+      '<strong class="sp-library-meta">Modificado</strong>' +
+      '<strong class="sp-library-type">Carpeta</strong>' +
+      '<strong class="sp-file-actions-header">Acciones</strong>' +
+      "</div>" +
+      filas +
+      "</div>" +
+      '<footer class="sp-library-pagination"><span>Mostrando 1\u2013' +
+      lista.length +
+      " de " +
+      lista.length +
+      "</span></footer>";
+  }
+
   function renderizarCargaAdjuntos() {
     return (
       '<section class="detail-upload-panel" aria-labelledby="titulo-agregar-adjuntos">' +
@@ -1002,6 +1141,7 @@ function renderizarGestion(datos, paginacion) {
     mostrarIndicadores: mostrarIndicadores,
     mostrarConexion: mostrarConexion,
     mostrarUsuario: mostrarUsuario,
+    configurarAcceso: configurarAcceso,
     formatearFecha: formatearFecha,
     renderizarTarjetas: renderizarTarjetas,
     renderizarTabla: renderizarTabla,
@@ -1012,6 +1152,7 @@ function renderizarGestion(datos, paginacion) {
     renderizarActividad: renderizarActividad,
     mostrarDetalle: mostrarDetalle,
     cambiarPaginaAdjuntos: cambiarPaginaAdjuntos,
+    renderizarArchivosFormulario: renderizarArchivosFormulario,
     cerrarDetalle: cerrarDetalle
   });
 

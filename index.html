@@ -6,12 +6,14 @@
   <meta name="description" content="Bit&#225;cora de requerimientos de Apps Colombia integrada con SharePoint Online.">
   <title>Bit&#225;cora | Backlog </title>
   <link rel="stylesheet"
-    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260729.26" />
+    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260731.37" />
 </head>
 <body>
   <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
 
+  <!-- Contenedor raíz: aísla la aplicación de los estilos de SharePoint. -->
   <div id="bitacora-app" class="app">
+    <!-- Navegación lateral compartida por todas las vistas. -->
     <aside class="sidebar" aria-label="Navegaci&#243;n principal">
       <div class="brand">
           <div class="brand-mark">
@@ -76,12 +78,14 @@
       </div>
     </aside>
 
+    <!-- Las vistas se alternan mediante el atributo hidden desde Vista.js. -->
     <main class="main" id="contenido-principal">
       <div class="environment-note" id="estado-conexion" role="status">
         <span class="status-dot" aria-hidden="true"></span>
         Datos administrados desde SharePoint Online
       </div>
 
+      <!-- Vista principal: indicadores rápidos y backlog paginado. -->
       <section id="view-dashboard" aria-labelledby="titulo-dashboard">
         <header class="top-row">
           <div>
@@ -208,6 +212,7 @@
         </section>
 
       </section>
+      <!-- Vista administrativa de indicadores y gráficas. -->
        <section id="view-indicadores" hidden>
 
               <header class="top-row">
@@ -358,6 +363,7 @@ Resumen operativo
 
 </section>
 
+      <!-- Formulario reutilizado para crear y editar requerimientos. -->
       <section id="view-crear-requerimiento" aria-labelledby="titulo-crear" hidden>
         <header class="top-row">
           <div>
@@ -407,6 +413,10 @@ Resumen operativo
                   
                 </select>
               </div>
+              <div class="form-group">
+                <label for="casoOrigen">Caso origen</label>
+                <input type="text" id="casoOrigen" placeholder="Si aplica, ingresa el n&#250;mero del requerimiento de soporte">
+              </div>
                
               <div class="form-group full">
                 <label for="asunto">Asunto *</label>
@@ -416,20 +426,24 @@ Resumen operativo
                 <label for="descripcion">Descripci&#243;n de la solicitud *</label>
                 <textarea id="descripcion" rows="6" maxlength="4000" required placeholder="Describe el contexto, la necesidad y el resultado esperado"></textarea>
               </div>
-              <div class="form-group">
-                <label for="casoOrigen">Caso origen</label>
-                <input type="text" id="casoOrigen" placeholder="Si aplica, ingresa el n&#250;mero del requerimiento de soporte">
-               </div>
-
               <div class="form-group full">
                 <label for="archivosAdjuntos">Archivos adjuntos</label>
-                <div class="file-field">
-                  <input type="file" id="archivosAdjuntos" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip">
-                  <span>PDF, Word, Excel, im&#225;genes o ZIP. M&#225;ximo 10 archivos de 20 MB cada uno.</span>
-                  <span>Si adjuntas un archivo, debes seleccionar obligatoriamente su tipo documental.</span>
-                  <span id="resumenArchivos" class="file-selection-summary" aria-live="polite">No hay archivos agregados.</span>
-                </div>
-                <div id="clasificacionArchivos" class="file-category-list" aria-live="polite" hidden></div>
+                <div id="archivos-existentes-edicion" hidden></div>
+                <section class="detail-upload-panel" aria-labelledby="titulo-agregar-archivos-formulario">
+                  <div class="detail-upload-heading">
+                    <div>
+                      <strong id="titulo-agregar-archivos-formulario">Agregar archivos</strong>
+                      <p>Selecciona uno o varios archivos y asigna su tipo documental.</p>
+                    </div>
+                    <label class="detail-file-picker" for="archivosAdjuntos">
+                      <span>Elegir archivos</span>
+                      <input type="file" id="archivosAdjuntos" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip">
+                    </label>
+                  </div>
+                  <p class="detail-upload-help">PDF, Word, Excel, im&#225;genes o ZIP. M&#225;ximo 10 archivos de 20 MB cada uno.</p>
+                  <p id="resumenArchivos" class="detail-upload-summary" aria-live="polite">No hay archivos agregados.</p>
+                  <div id="clasificacionArchivos" class="file-category-list" aria-live="polite" hidden></div>
+                </section>
               </div>
             </div>
           </section>
@@ -490,6 +504,55 @@ Resumen operativo
             </div>
           </section>
 
+          <section class="panel" id="campos-administrativos" aria-labelledby="titulo-info-administrativa" hidden>
+            <div class="panel-heading">
+              <div>
+                <h2 id="titulo-info-administrativa">Informaci&#243;n administrativa</h2>
+                <p>Campos disponibles para los administradores durante la edici&#243;n.</p>
+              </div>
+            </div>
+            <div class="form-grid three-columns">
+              <div class="form-group full">
+                <label for="comentarios">Comentarios (m&#225;ximo 500 caracteres)</label>
+                <textarea id="comentarios" rows="4" maxlength="500" placeholder="Observaciones y comentarios del requerimiento"></textarea>
+              </div>
+              <div class="form-group">
+                <label for="responsable">Responsable</label>
+                <input type="email" id="responsable" placeholder="correo@hitss.com">
+              </div>
+              <div class="form-group">
+                <label for="mentor">Mentor</label>
+                <input type="email" id="mentor" placeholder="correo@hitss.com">
+              </div>
+              <div class="form-group">
+                <label for="prioridad">Prioridad</label>
+                <select id="prioridad">
+                  <option value="">Sin definir</option>
+                  <option>Baja</option><option>Media</option><option>Alta</option><option>Cr&#237;tica</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="fechaEntrega">F.E entrega</label>
+                <input type="date" id="fechaEntrega">
+              </div>
+              <div class="form-group">
+                <label for="complejidad">Complejidad</label>
+                <select id="complejidad">
+                  <option value="">Sin definir</option>
+                  <option>Baja</option><option>Media</option><option>Alta</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="fechaPAP">F.E PAP</label>
+                <input type="date" id="fechaPAP">
+              </div>
+              <div class="form-group">
+                <label for="fechaCierre">F.E cierre</label>
+                <input type="date" id="fechaCierre">
+              </div>
+            </div>
+          </section>
+
           <section class="panel form-actions-panel">
             <div class="acciones-formulario">
               <button class="btn-secondary" id="btn-cancelar" type="button">Cancelar</button>
@@ -500,6 +563,7 @@ Resumen operativo
         </div>
       </section>
 
+      <!-- Vista filtrada con los requerimientos del usuario en sesión. -->
       <section id="view-mis-requerimientos" aria-labelledby="titulo-mis-requerimientos" hidden>
         <header class="top-row">
           <div>
@@ -576,6 +640,7 @@ Resumen operativo
         </section>
       </section>
 
+      <!-- Auditoría de acciones registrada en la lista de historial. -->
       <section id="view-historial" aria-labelledby="titulo-historial" hidden>
         <header class="top-row">
           <div>
@@ -646,6 +711,7 @@ Resumen operativo
         </section>
       </section>
 
+      <!-- Gestión global disponible solamente para administradores. -->
       <section id="view-gestion" class="admin-only" aria-labelledby="titulo-gestion" hidden>
         <header class="top-row">
           <div>
@@ -733,9 +799,10 @@ Resumen operativo
     </div>
   </div>
 
-  <script charset="utf-8" src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260729.26"></script>
-  <script charset="utf-8" src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260729.26"></script>
-  <script charset="utf-8" src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260729.28"></script>
+  <!-- Orden MVC: el Controlador se carga al final porque depende de Modelo y Vista. -->
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260731.36"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260731.36"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260731.36"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>

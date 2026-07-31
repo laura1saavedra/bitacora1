@@ -1,14 +1,19 @@
 // ============================================================
 // MODELO.JS
-// Datos, configuracion y acceso REST a SharePoint.
+// Datos, configuración y acceso REST a SharePoint.
+// Esta capa centraliza la traducción entre el dominio de la aplicación y OData.
 // ============================================================
 (function (global) {
   "use strict";
 
+  // Valores de infraestructura y límites compartidos por todas las operaciones.
   const CONFIG = Object.freeze({
     lista: "Backlog",
     listaHistorial: "HistorialActividad",
     bibliotecaArchivos: "ArchivosRequerimientos",
+    // Uso temporal mientras se crean los permisos definitivos.
+    // Agregue aqu\u00ed los correos que deban ver las opciones administrativas.
+    administradoresTemporales: ["saavedral@hitss.com"],
     tamanoMaximoArchivo: 20 * 1024 * 1024,
     cantidadMaximaArchivos: 10,
     sitioAlterno:
@@ -17,6 +22,8 @@
     reintentos: 3
   });
 
+  // Mapea cada propiedad del dominio con su columna real en SharePoint. Los
+  // títulos alternativos permiten tolerar diferencias entre ambientes.
   const CAMPOS = Object.freeze({
     id: {
       interno: "Title",
@@ -97,7 +104,11 @@
   let tipoEntidadHistorial = null;
   let esquemaLista = null;
   let ultimoDiagnosticoEscritura = null;
+  let esAdministradorActual = null;
 
+  // --------------------------------------------------------------------------
+  // Contexto de SharePoint y construcción segura de rutas
+  // --------------------------------------------------------------------------
   function urlSitio() {
     const contexto = global._spPageContextInfo;
     return contexto && contexto.webAbsoluteUrl
@@ -173,6 +184,57 @@
         "Usuario Microsoft 365",
       correo: contexto.userEmail || contexto.userLoginName || ""
     };
+  }
+
+  async function esAdministrador() {
+    if (esAdministradorActual !== null) {
+      return esAdministradorActual;
+    }
+
+    try {
+      const correoActual = String(usuarioActual().correo || "")
+        .trim()
+        .toLowerCase();
+      const administradorTemporal =
+        CONFIG.administradoresTemporales.some(function (correo) {
+          return String(correo || "").trim().toLowerCase() === correoActual;
+        });
+      const contexto = global._spPageContextInfo || {};
+
+      if (administradorTemporal || contexto.isSiteAdmin === true) {
+        esAdministradorActual = true;
+        return esAdministradorActual;
+      }
+      if (!estaEnSharePoint()) {
+        esAdministradorActual = false;
+        return esAdministradorActual;
+      }
+
+      const respuestaUsuario = await solicitar(
+        urlSitio() +
+          "/_api/web/currentuser?$select=Id,Title,Email,LoginName,IsSiteAdmin",
+        {
+          method: "GET",
+          credentials: "same-origin",
+          headers: ODATA
+        }
+      );
+      if (!respuestaUsuario.ok) {
+        throw new Error(
+          "No se pudo consultar el rol del usuario (" +
+          respuestaUsuario.status +
+          ")."
+        );
+      }
+      const datosUsuario = await respuestaUsuario.json();
+      const usuario = datosUsuario.d || datosUsuario;
+      esAdministradorActual = usuario.IsSiteAdmin === true;
+    } catch (error) {
+      esAdministradorActual = false;
+      console.warn("Validaci\u00f3n temporal de administrador:", error);
+    }
+
+    return esAdministradorActual;
   }
 
   function endpointLista() {
@@ -278,6 +340,7 @@
       const campo = resolverCampo(clave);
       if (campo && campo.tipo.indexOf("User") === 0) {
         seleccion.push(campo.nombreInterno + "/Title");
+        seleccion.push(campo.nombreInterno + "/EMail");
         expansion.push(campo.nombreInterno);
       }
     });
@@ -329,6 +392,10 @@
               : idPersona != null
                 ? "Usuario #" + idPersona
                 : "";
+        resultado[clave + "Correo"] =
+          valor && (valor.EMail || valor.Email)
+            ? valor.EMail || valor.Email
+            : "";
       } else {
         resultado[clave] = valor == null ? "" : valor;
       }
@@ -504,6 +571,9 @@
     });
   }
 
+  // --------------------------------------------------------------------------
+  // Transporte REST: reintentos, errores de SharePoint y request digest
+  // --------------------------------------------------------------------------
   async function solicitar(url, opciones, intento) {
     const numeroIntento = intento || 1;
     const respuesta = await fetch(url, opciones);
@@ -790,6 +860,9 @@
     };
   }
 
+  // --------------------------------------------------------------------------
+  // Operaciones CRUD de requerimientos
+  // --------------------------------------------------------------------------
   async function obtenerTodos() {
     let siguiente =
       endpointLista() +
@@ -915,6 +988,9 @@
     return desdeSharePoint(datos.d);
   }
 
+  // --------------------------------------------------------------------------
+  // Biblioteca documental: carpetas, carga, consulta y reciclaje de archivos
+  // --------------------------------------------------------------------------
   async function asegurarCarpeta(rutaCarpeta) {
     const endpointCarpeta =
       urlSitio() +
@@ -1230,6 +1306,36 @@
     return obtenerPorId(id);
   }
 
+  async function reciclarArchivo(urlArchivo) {
+    const ruta = String(urlArchivo || "").trim();
+    if (!ruta) {
+      throw new Error("No se encontr\u00f3 la ruta del archivo.");
+    }
+    const valorDigest = await digest();
+    const respuesta = await solicitar(
+      urlSitio() +
+        "/_api/web/GetFileByServerRelativeUrl('" +
+        literalOData(ruta) +
+        "')/recycle()",
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: Object.assign({}, ODATA, {
+          "X-RequestDigest": valorDigest
+        })
+      }
+    );
+    if (!respuesta.ok) {
+      const detalle = await detalleErrorSharePoint(respuesta);
+      throw new Error(
+        "No se pudo eliminar el archivo (HTTP " +
+          respuesta.status +
+          ")" +
+          (detalle ? ": " + detalle : ".")
+      );
+    }
+  }
+
   async function eliminar(id) {
     const existente = await obtenerPorId(id);
     if (!existente) {
@@ -1494,6 +1600,7 @@ async function obtenerDatosIndicadores() {
     urlSitio: urlSitio,
     estaEnSharePoint: estaEnSharePoint,
     usuarioActual: usuarioActual,
+    esAdministrador: esAdministrador,
     verificarConexion: verificarConexion,
     obtenerTiposDocumento: obtenerTiposDocumento,
     obtenerTodos: obtenerTodos,
@@ -1505,6 +1612,7 @@ async function obtenerDatosIndicadores() {
     obtenerDocumentosRequerimiento: obtenerDocumentosRequerimiento,
     buscarUsuariosMicrosoft: buscarUsuariosMicrosoft,
     actualizar: actualizar,
+    reciclarArchivo: reciclarArchivo,
     resolverUsuarioPorCorreo: resolverUsuarioPorCorreo,
     eliminar: eliminar,
     obtenerBitacora: obtenerBitacora,

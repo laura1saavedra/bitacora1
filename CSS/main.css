@@ -1,3 +1,8 @@
+/*
+ * Estilos de la Bitácora de requerimientos.
+ * Las reglas se limitan a #bitacora-app para no afectar el chrome de SharePoint.
+ */
+
 html,
 body {
   width: 100%;
@@ -9,6 +14,7 @@ body {
   background: #f3f6fa;
 }
 
+/* Tokens visuales compartidos por componentes, estados y vistas. */
 #bitacora-app {
   --navy-950: #08152d;
   --navy-900: #10213f;
@@ -1726,6 +1732,20 @@ opacity:.9;
   background: #f6f7f9;
   color: #9aa4b2;
   cursor: not-allowed;
+}
+
+.sp-file-delete {
+  padding: 0;
+  color: #c92a2a;
+  cursor: pointer;
+}
+
+.sp-file-delete:hover,
+.sp-file-delete:focus-visible {
+  border-color: #f0a8a8;
+  background: #fff1f1;
+  color: #a51111;
+  box-shadow: 0 0 0 2px rgba(201, 42, 42, 0.12);
 }
 
 .sp-file-action svg {

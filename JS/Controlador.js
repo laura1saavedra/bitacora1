@@ -1,15 +1,18 @@
 // ============================================================
 // CONTROLADOR.JS
-// Coordina el Modelo con la Vista y gestiona los eventos.
+// Coordina el Modelo con la Vista y gestiona los eventos de la aplicación.
+// Conserva aquí el estado de sesión; Modelo y Vista permanecen desacoplados.
 // ============================================================
 (function (global) {
   "use strict";
 
+  // Estado general de navegación, permisos y datos cargados.
   let requerimientos = [];
   let eventosRegistrados = false;
   let inicializacionIniciada = false;
   let observadorChromeSharePoint = null;
   let documentoObservadoSharePoint = null;
+  // Estado temporal de formularios, edición y selección de usuarios.
   let requerimientoEnEdicion = null;
   let origenEdicion = "mis";
   // Usuarios seleccionados para el campo Solicitado por
@@ -27,6 +30,7 @@
   let paginaHistorial = 1;
   let dialogoMensajeActual = null;
   let focoAntesDelDialogo = null;
+  // Reglas de paginación y carga documental de la interfaz.
   const REQUERIMIENTOS_POR_PAGINA = 5;
   const ACTIVIDADES_POR_PAGINA = 8;
   const TIPOS_DOCUMENTO_PREDETERMINADOS = [
@@ -41,7 +45,10 @@
   let requerimientoDetalleActual = null;
   let archivosDetalleSeleccionados = [];
   const tiposDocumentoDetalleSeleccionados = new Map();
+  let esAdministradorSesion = false;
 
+  // Elementos del contenedor clásico de SharePoint que se ajustan únicamente
+  // en modo de visualización; el modo de edición conserva sus herramientas.
   const SELECTORES_CHROME_SHAREPOINT = [
     "#suiteBar",
     "#suiteBarTop",
@@ -65,6 +72,9 @@
     ".ms-WPBody"
   ];
 
+  // --------------------------------------------------------------------------
+  // Integración visual con la página contenedora de SharePoint
+  // --------------------------------------------------------------------------
   function obtenerDocumentoSharePoint() {
     try {
       if (
@@ -254,6 +264,9 @@
     global.setTimeout(aplicarAjustesSharePoint, 1000);
   }
 
+  // --------------------------------------------------------------------------
+  // Inicio de la aplicación y carga inicial
+  // --------------------------------------------------------------------------
   async function iniciar() {
     if (inicializacionIniciada) {
       return;
@@ -262,6 +275,8 @@
     configurarVistaSharePoint();
     registrarEventos();
     Vista.mostrarUsuario(Modelo.usuarioActual());
+    esAdministradorSesion = await Modelo.esAdministrador();
+    Vista.configurarAcceso(esAdministradorSesion);
     const conectado = await comprobarConexion();
     if (conectado) {
       await cargarTiposDocumento();
@@ -1017,7 +1032,8 @@ if(graficaResponsables){
       })
       .join("\r\n");
     const blob = new Blob(["\ufeff" + csv], {
-      type: "text/csv;charset=utf-8;"
+      // El BOM incluido arriba permite que Excel reconozca correctamente el CSV.
+      type: "text/csv"
     });
     const url = URL.createObjectURL(blob);
     const enlace = document.createElement("a");
@@ -1168,6 +1184,13 @@ if(graficaResponsables){
       "Los campos marcados con * son obligatorios.";
     document.getElementById("btn-guardar").textContent = "Guardar requerimiento";
     document.getElementById("btn-limpiar").hidden = false;
+    document.getElementById("campos-administrativos").hidden = true;
+    document.getElementById("id").readOnly = true;
+    document.getElementById("estado").readOnly = true;
+    document.getElementById("fechaSolicitud").readOnly = true;
+    document.getElementById("buscarUsuario").hidden = false;
+    document.getElementById("buscarUsuario").disabled = false;
+    Vista.renderizarArchivosFormulario([]);
 
     [
       "id",
@@ -1178,7 +1201,15 @@ if(graficaResponsables){
       "casoOrigen",
       "solicitadoPor",
       "estado",
-      "fechaSolicitud"
+      "fechaSolicitud",
+      "comentarios",
+      "responsable",
+      "mentor",
+      "prioridad",
+      "fechaEntrega",
+      "complejidad",
+      "fechaPAP",
+      "fechaCierre"
     ].forEach(function (id) {
       const campo = document.getElementById(id);
       if (campo) {
@@ -1229,6 +1260,14 @@ if(graficaResponsables){
 
   async function editarRequerimiento(id, origen) {
     const origenFinal = origen === "dashboard" ? "dashboard" : "mis";
+    if (!esAdministradorSesion) {
+      await mostrarAlerta({
+        icon: "warning",
+        title: "Edici\u00f3n no permitida",
+        text: "Solo los administradores de la Bit\u00e1cora pueden editar requerimientos."
+      });
+      return;
+    }
     try {
       const req = await Modelo.obtenerPorId(id);
       if (!req) {
@@ -1258,10 +1297,15 @@ if(graficaResponsables){
         "Actualiza la informaci\u00f3n de tu solicitud.";
       document.getElementById("btn-guardar").textContent = "Guardar cambios";
       document.getElementById("btn-limpiar").hidden = true;
+      document.getElementById("campos-administrativos").hidden = false;
+      document.getElementById("estado").readOnly = false;
+      document.getElementById("buscarUsuario").value = "";
+      document.getElementById("buscarUsuario").hidden = true;
+      document.getElementById("buscarUsuario").disabled = true;
       limpiarClasificacionArchivos();
       document.getElementById("id").value = req.id || "";
-      document.getElementById("app").value = req.app || "";
-      document.getElementById("tipoServicio").value = req.tipoServicio || "";
+      establecerValorSeleccion("app", req.app);
+      establecerValorSeleccion("tipoServicio", req.tipoServicio);
       document.getElementById("casoOrigen").value = req.casoOrigen || "";
       document.getElementById("asunto").value = req.asunto || "";
       document.getElementById("descripcion").value = req.descripcion || "";
@@ -1269,6 +1313,33 @@ if(graficaResponsables){
       document.getElementById("estado").value = req.estado || "";
       document.getElementById("fechaSolicitud").value =
         Vista.formatearFecha(req.fechaSolicitud);
+      document.getElementById("comentarios").value = String(
+        req.comentarios || ""
+      ).slice(0, 500);
+      document.getElementById("responsable").value =
+        req.responsableCorreo || req.responsable || "";
+      document.getElementById("mentor").value =
+        req.mentorCorreo || req.mentor || "";
+      establecerValorSeleccion("prioridad", req.prioridad);
+      document.getElementById("fechaEntrega").value =
+        fechaParaCalendario(req.fechaEntrega);
+      establecerValorSeleccion("complejidad", req.complejidad);
+      document.getElementById("fechaPAP").value =
+        fechaParaCalendario(req.fechaPAP);
+      document.getElementById("fechaCierre").value =
+        fechaParaCalendario(req.fechaCierre);
+
+      usuariosSeleccionados = String(req.solicitadoPor || "")
+        .split(/[;\n]/)
+        .map(function (nombre) {
+          return nombre.trim();
+        })
+        .filter(Boolean)
+        .map(function (nombre) {
+          return { nombre: nombre, correo: "" };
+        });
+      renderizarUsuariosSeleccionados();
+      Vista.renderizarArchivosFormulario(req.archivosAdjuntos || []);
 
       Vista.mostrarFormularioEdicion();
     } catch (error) {
@@ -1280,6 +1351,101 @@ if(graficaResponsables){
     }
   }
 
+  async function eliminarArchivoEdicion(boton) {
+    if (!esAdministradorSesion || !requerimientoEnEdicion) {
+      return;
+    }
+    const url = boton.dataset.eliminarArchivo || "";
+    const nombre = boton.dataset.nombreArchivo || "el archivo";
+    const confirmacion = await mostrarDialogo({
+      icon: "warning",
+      title: "Eliminar archivo",
+      text:
+        "\u00bfDeseas eliminar \"" +
+        nombre +
+        "\"? El archivo se enviar\u00e1 a la papelera de reciclaje de SharePoint.",
+      showCancelButton: true,
+      confirmButtonText: "Eliminar",
+      cancelButtonText: "Cancelar"
+    });
+    if (!confirmacion.isConfirmed) {
+      return;
+    }
+
+    boton.disabled = true;
+    try {
+      await Modelo.reciclarArchivo(url);
+      requerimientoEnEdicion =
+        await Modelo.obtenerPorId(requerimientoEnEdicion.id);
+      Vista.renderizarArchivosFormulario(
+        requerimientoEnEdicion
+          ? requerimientoEnEdicion.archivosAdjuntos || []
+          : []
+      );
+      await mostrarAlerta({
+        icon: "success",
+        title: "Archivo eliminado",
+        text: "El archivo fue enviado a la papelera de reciclaje."
+      });
+    } catch (error) {
+      boton.disabled = false;
+      await mostrarAlerta({
+        icon: "error",
+        title: "No se pudo eliminar el archivo",
+        text: error.message
+      });
+    }
+  }
+
+  function establecerValorSeleccion(id, valor) {
+    const campo = document.getElementById(id);
+    const texto = String(valor || "").trim();
+    if (!campo) {
+      return;
+    }
+    if (
+      texto &&
+      !Array.from(campo.options).some(function (opcion) {
+        return opcion.value === texto;
+      })
+    ) {
+      campo.add(new Option(texto, texto));
+    }
+    campo.value = texto;
+  }
+
+  function fechaParaCalendario(valor) {
+    if (!valor) {
+      return "";
+    }
+    const texto = String(valor).trim();
+    const fechaISO = /^(\d{4})-(\d{2})-(\d{2})/.exec(texto);
+    if (fechaISO) {
+      return fechaISO[1] + "-" + fechaISO[2] + "-" + fechaISO[3];
+    }
+    const fechaLatina = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(texto);
+    if (fechaLatina) {
+      return (
+        fechaLatina[3] +
+        "-" +
+        fechaLatina[2].padStart(2, "0") +
+        "-" +
+        fechaLatina[1].padStart(2, "0")
+      );
+    }
+    const fecha = new Date(texto);
+    if (isNaN(fecha.getTime())) {
+      return "";
+    }
+    return (
+      fecha.getUTCFullYear() +
+      "-" +
+      String(fecha.getUTCMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(fecha.getUTCDate()).padStart(2, "0")
+    );
+  }
+
   function datosFormulario() {
     return {
       id: document.getElementById("id").value,
@@ -1289,9 +1455,19 @@ if(graficaResponsables){
       descripcion: document.getElementById("descripcion").value.trim(),
       casoOrigen: document.getElementById("casoOrigen").value.trim(),
       solicitadoPor: document.getElementById("solicitadoPor").value.trim(),
-      responsable: "No asignado",
+      comentarios: document
+        .getElementById("comentarios")
+        .value.trim()
+        .slice(0, 500),
+      responsable: document.getElementById("responsable").value.trim(),
+      mentor: document.getElementById("mentor").value.trim(),
       estado: document.getElementById("estado").value,
-      fechaSolicitud: document.getElementById("fechaSolicitud").value
+      prioridad: document.getElementById("prioridad").value,
+      fechaSolicitud: document.getElementById("fechaSolicitud").value.trim(),
+      fechaEntrega: document.getElementById("fechaEntrega").value.trim(),
+      complejidad: document.getElementById("complejidad").value,
+      fechaPAP: document.getElementById("fechaPAP").value.trim(),
+      fechaCierre: document.getElementById("fechaCierre").value.trim()
     };
   }
 
@@ -1902,9 +2078,11 @@ function renderizarUsuariosSeleccionados() {
 
                 usuario.nombre +
 
-                '<button type="button" data-index="' +
-                index +
-                '">&times;</button>' +
+                (!requerimientoEnEdicion
+                  ? '<button type="button" data-index="' +
+                    index +
+                    '">&times;</button>'
+                  : "") +
 
                 '</div>'
 
@@ -2025,6 +2203,14 @@ async function buscarUsuarios() {
 }
 
   async function guardarFormulario() {
+    if (requerimientoEnEdicion && !esAdministradorSesion) {
+      await mostrarAlerta({
+        icon: "warning",
+        title: "Edici\u00f3n no permitida",
+        text: "Solo los administradores de la Bit\u00e1cora pueden guardar cambios."
+      });
+      return;
+    }
     const datos = datosFormulario();
     const archivosClasificados = archivosClasificadosFormulario();
     const botonGuardar = document.getElementById("btn-guardar");
@@ -2035,17 +2221,43 @@ async function buscarUsuarios() {
     try {
       validarArchivos(archivosClasificados);
       if (requerimientoEnEdicion) {
+        const cambios = {
+          app: datos.app,
+          tipoServicio: datos.tipoServicio,
+          asunto: datos.asunto,
+          descripcion: datos.descripcion,
+          comentarios: datos.comentarios,
+          casoOrigen: datos.casoOrigen,
+          estado: datos.estado,
+          prioridad: datos.prioridad,
+          fechaEntrega: datos.fechaEntrega,
+          complejidad: datos.complejidad,
+          fechaPAP: datos.fechaPAP,
+          fechaCierre: datos.fechaCierre
+        };
+        const responsableOriginal =
+          requerimientoEnEdicion.responsableCorreo ||
+          requerimientoEnEdicion.responsable ||
+          "";
+        const mentorOriginal =
+          requerimientoEnEdicion.mentorCorreo ||
+          requerimientoEnEdicion.mentor ||
+          "";
+
+        if (datos.responsable !== responsableOriginal) {
+          cambios.responsable = datos.responsable
+            ? (await Modelo.resolverUsuarioPorCorreo(datos.responsable)).id
+            : null;
+        }
+        if (datos.mentor !== mentorOriginal) {
+          cambios.mentor = datos.mentor
+            ? (await Modelo.resolverUsuarioPorCorreo(datos.mentor)).id
+            : null;
+        }
+
         const requerimientoActualizado = await Modelo.actualizar(
           requerimientoEnEdicion.id,
-          {
-            app: datos.app,
-            tipoServicio: datos.tipoServicio,
-            asunto: datos.asunto,
-            descripcion: datos.descripcion,
-            casoOrigen: datos.casoOrigen,
-            prioridad: datos.prioridad,
-            solicitadoPor: datos.solicitadoPor
-          }
+          cambios
         );
         const resultadoArchivos = await Modelo.guardarArchivosRequerimiento(
           requerimientoActualizado,
@@ -2432,7 +2644,8 @@ async function buscarUsuarios() {
       })
       .join("\r\n");
     const blob = new Blob(["\ufeff" + csv], {
-      type: "text/csv;charset=utf-8;"
+      // El BOM incluido arriba permite que Excel reconozca correctamente el CSV.
+      type: "text/csv"
     });
     const url = URL.createObjectURL(blob);
     const enlace = document.createElement("a");
@@ -2733,6 +2946,16 @@ if(btnLimpiarIndicadores){
     document
       .getElementById("archivosAdjuntos")
       .addEventListener("change", agregarArchivosSeleccionados);
+    document
+      .getElementById("archivos-existentes-edicion")
+      .addEventListener("click", function (evento) {
+        const boton = evento.target.closest(
+          "button[data-eliminar-archivo]"
+        );
+        if (boton && !boton.disabled) {
+          eliminarArchivoEdicion(boton);
+        }
+      });
     document
       .getElementById("btn-limpiar")
       .addEventListener("click", function (evento) {
