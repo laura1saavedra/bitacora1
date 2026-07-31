@@ -9,6 +9,9 @@
   // Valores de infraestructura y límites compartidos por todas las operaciones.
   const CONFIG = Object.freeze({
     lista: "Backlog",
+    listaApps: "CatalogoAPP",
+    listaPrioridades: "CatalogoPrioridades",
+    listaEstados: "CatalogoEstados",
     listaHistorial: "HistorialActividad",
     bibliotecaArchivos: "ArchivosRequerimientos",
     // Uso temporal mientras se crean los permisos definitivos.
@@ -30,7 +33,13 @@
       tipo: "texto",
       titulos: ["ID REQ", "ID Requerimiento", "Title", "Titulo"]
     },
-    app: { interno: "APP", tipo: "texto", titulos: ["APP", "Aplicacion"] },
+    app: {
+      interno: "APP_x005f_Catalogo",
+      tipo: "busqueda",
+      listaCatalogo: "CatalogoAPP",
+      tituloBacklog: "APP_Catalogo",
+      titulos: ["CatalogoAPP", "Catálogo APP", "APP_Catalogo", "APP Catálogo"]
+    },
     tipoServicio: {
       interno: "Tipo_x0020_de_x0020_servicio",
       tipo: "texto",
@@ -53,11 +62,19 @@
       titulos: ["Responsable"]
     },
     prioridad: {
-      interno: "Prioridad",
-      tipo: "texto",
-      titulos: ["Prioridad"]
+      interno: "Prioridades_x005f_Catalogo",
+      tipo: "busqueda",
+      listaCatalogo: "CatalogoPrioridades",
+      tituloBacklog: "Prioridades_Catalogo",
+      titulos: ["Prioridades_Catalogo", "Prioridad_Catalogo", "Catálogo de prioridades"]
     },
-    estado: { interno: "Estado", tipo: "texto", titulos: ["Estado"] },
+    estado: {
+      interno: "Estado_x005f_Catalogo",
+      tipo: "busqueda",
+      listaCatalogo: "CatalogoEstados",
+      tituloBacklog: "Estado_Catalogo",
+      titulos: ["Estado_Catalogo", "Estados_Catalogo", "Catálogo de estados"]
+    },
     comentarios: {
       interno: "Comentarios",
       tipo: "texto",
@@ -103,6 +120,9 @@
   let tipoEntidadLista = null;
   let tipoEntidadHistorial = null;
   let esquemaLista = null;
+  let catalogosPorNombre = {};
+  let elementosCatalogoPorNombre = {};
+  let camposRelacionPorClave = {};
   let ultimoDiagnosticoEscritura = null;
   let esAdministradorActual = null;
 
@@ -247,6 +267,92 @@
     );
   }
 
+  function endpointCatalogo(nombreLista) {
+    const tituloSeguro = String(nombreLista || "").replace(/'/g, "''");
+    return (
+      urlSitio() +
+      "/_api/web/lists/getbytitle('" +
+      tituloSeguro +
+      "')"
+    );
+  }
+
+  async function obtenerCatalogo(nombreLista) {
+    const claveRelacion = Object.keys(CAMPOS).find(function (clave) {
+      return CAMPOS[clave].listaCatalogo === nombreLista;
+    });
+    const campoRelacion = claveRelacion ? resolverCampo(claveRelacion) : null;
+    const campoTitulo =
+      campoRelacion && campoRelacion.campoBusqueda
+        ? campoRelacion.campoBusqueda
+        : "Title";
+    let siguiente =
+      endpointCatalogo(nombreLista) +
+      "/items?$select=Id," +
+      encodeURIComponent(campoTitulo) +
+      "&$orderby=Id&$top=5000";
+    const elementos = [];
+
+    while (siguiente) {
+      const respuesta = await solicitar(siguiente, {
+        method: "GET",
+        credentials: "same-origin",
+        headers: ODATA
+      });
+      if (!respuesta.ok) {
+        const detalle = await detalleErrorSharePoint(respuesta);
+        throw new Error(
+          "No se pudo consultar " +
+            nombreLista +
+            " (HTTP " +
+            respuesta.status +
+            ")" +
+            (detalle ? ": " + detalle : ".")
+        );
+      }
+      const datos = await respuesta.json();
+      Array.prototype.push.apply(elementos, datos.d.results);
+      siguiente = datos.d.__next || null;
+    }
+
+    return elementos
+      .map(function (elemento) {
+        return {
+          id: Number(elemento.Id),
+          nombre: String(elemento[campoTitulo] || "").trim()
+        };
+      })
+      .filter(function (elemento) {
+        return elemento.id > 0 && elemento.nombre;
+      });
+  }
+
+  async function obtenerCatalogos() {
+    const resultados = await Promise.all([
+      obtenerCatalogo(CONFIG.listaApps),
+      obtenerCatalogo(CONFIG.listaPrioridades),
+      obtenerCatalogo(CONFIG.listaEstados)
+    ]);
+    const catalogos = {
+      apps: resultados[0],
+      prioridades: resultados[1],
+      estados: resultados[2]
+    };
+    elementosCatalogoPorNombre = {};
+    elementosCatalogoPorNombre[CONFIG.listaApps] = catalogos.apps;
+    elementosCatalogoPorNombre[CONFIG.listaPrioridades] = catalogos.prioridades;
+    elementosCatalogoPorNombre[CONFIG.listaEstados] = catalogos.estados;
+    return catalogos;
+  }
+
+  function buscarElementoCatalogo(nombreLista, id) {
+    const elementos = elementosCatalogoPorNombre[nombreLista] || [];
+    const idBuscado = Number(id);
+    return elementos.find(function (elemento) {
+      return Number(elemento.id) === idBuscado;
+    }) || null;
+  }
+
   function endpointHistorial() {
     const tituloSeguro = CONFIG.listaHistorial.replace(/'/g, "''");
     return (
@@ -342,6 +448,12 @@
         seleccion.push(campo.nombreInterno + "/Title");
         seleccion.push(campo.nombreInterno + "/EMail");
         expansion.push(campo.nombreInterno);
+      } else if (campo && campo.tipo.indexOf("Lookup") === 0) {
+        seleccion.push(campo.nombreInterno + "/Id");
+        seleccion.push(
+          campo.nombreInterno + "/" + (campo.campoBusqueda || "Title")
+        );
+        expansion.push(campo.nombreInterno);
       }
     });
 
@@ -382,6 +494,10 @@
         campoReal
           ? campoReal.tipo.indexOf("User") === 0
           : configuracion.tipo === "persona";
+      const esBusqueda =
+        campoReal
+          ? campoReal.tipo.indexOf("Lookup") === 0
+          : configuracion.tipo === "busqueda";
       if (esPersona) {
         const idPersona = item[nombreInterno + "Id"];
         resultado[clave] =
@@ -396,6 +512,26 @@
           valor && (valor.EMail || valor.Email)
             ? valor.EMail || valor.Email
             : "";
+      } else if (esBusqueda) {
+        const idBusqueda = item[nombreInterno + "Id"];
+        const propiedadBusqueda =
+          campoReal && campoReal.campoBusqueda
+            ? campoReal.campoBusqueda
+            : "Title";
+        resultado[clave] =
+          valor && valor[propiedadBusqueda] != null
+            ? valor[propiedadBusqueda]
+            : valor && valor.Title
+              ? valor.Title
+            : valor != null && typeof valor !== "object"
+              ? valor
+              : "";
+        resultado[clave + "Id"] =
+          valor && valor.Id != null
+            ? Number(valor.Id)
+            : idBusqueda != null
+              ? Number(idBusqueda)
+              : null;
       } else {
         resultado[clave] = valor == null ? "" : valor;
       }
@@ -420,6 +556,36 @@
     if (!configuracion || !esquemaLista) {
       return null;
     }
+    if (camposRelacionPorClave[clave]) {
+      return camposRelacionPorClave[clave];
+    }
+    const alternativas = [configuracion.interno]
+      .concat(configuracion.titulos || [])
+      .map(normalizarNombre);
+
+    if (configuracion.listaCatalogo) {
+      const catalogo = catalogosPorNombre[configuracion.listaCatalogo];
+      const camposCatalogo = catalogo
+        ? esquemaLista.filter(function (campo) {
+            return (
+              campo.tipo.indexOf("Lookup") === 0 &&
+              normalizarGuid(campo.listaBusqueda) === normalizarGuid(catalogo.id)
+            );
+          })
+        : [];
+      if (camposCatalogo.length) {
+        const coincidenciaNombre = camposCatalogo.find(function (campo) {
+          return (
+            alternativas.indexOf(normalizarNombre(campo.titulo)) !== -1 ||
+            alternativas.indexOf(normalizarNombre(campo.nombreInterno)) !== -1
+          );
+        });
+        const coincidenciaVisible = camposCatalogo.find(function (campo) {
+          return !campo.oculto && !campo.soloLectura;
+        });
+        return coincidenciaNombre || coincidenciaVisible || camposCatalogo[0];
+      }
+    }
 
     const coincidenciaInterna = esquemaLista.find(function (campo) {
       return campo.nombreInterno === configuracion.interno;
@@ -428,15 +594,32 @@
       return coincidenciaInterna;
     }
 
-    const alternativas = [configuracion.interno]
-      .concat(configuracion.titulos || [])
-      .map(normalizarNombre);
     return esquemaLista.find(function (campo) {
       return (
         alternativas.indexOf(normalizarNombre(campo.titulo)) !== -1 ||
         alternativas.indexOf(normalizarNombre(campo.nombreInterno)) !== -1
       );
     }) || null;
+  }
+
+  function normalizarGuid(valor) {
+    return String(valor || "")
+      .replace(/[{}]/g, "")
+      .trim()
+      .toLowerCase();
+  }
+
+  function convertirCampoEsquema(campo) {
+    return {
+      titulo: campo.Title,
+      nombreInterno: campo.InternalName,
+      tipo: campo.TypeAsString,
+      oculto: campo.Hidden,
+      soloLectura: campo.ReadOnlyField,
+      obligatorio: campo.Required,
+      listaBusqueda: campo.LookupList || "",
+      campoBusqueda: campo.LookupField || ""
+    };
   }
 
   function fechaIso(valor) {
@@ -503,6 +686,71 @@
       }
 
       const campo = resolverCampo(clave);
+      const configuracion = CAMPOS[clave];
+      if (configuracion.tipo === "busqueda") {
+        const catalogo = catalogosPorNombre[configuracion.listaCatalogo];
+        if (!campo) {
+          throw new Error(
+            "No se encontró la columna " +
+              configuracion.tituloBacklog +
+              " en Backlog."
+          );
+        }
+        if (campo.soloLectura) {
+          throw new Error(
+            "La columna " +
+              configuracion.tituloBacklog +
+              " es de solo lectura y no se puede actualizar."
+          );
+        }
+        if (campo.tipo.indexOf("Lookup") === 0) {
+          if (
+            !catalogo ||
+            normalizarGuid(campo.listaBusqueda) !== normalizarGuid(catalogo.id)
+          ) {
+            throw new Error(
+              "La columna " +
+                configuracion.tituloBacklog +
+                " es Lookup, pero no apunta a la lista " +
+                configuracion.listaCatalogo +
+                "."
+            );
+          }
+        } else if (
+          campo.tipo === "Text" ||
+          campo.tipo === "Note" ||
+          campo.tipo === "Choice"
+        ) {
+          if (item[clave] === null || item[clave] === "") {
+            resultado[campo.nombreInterno] = null;
+            return;
+          }
+          const elemento = buscarElementoCatalogo(
+            configuracion.listaCatalogo,
+            item[clave]
+          );
+          if (!elemento) {
+            throw new Error(
+              "La opción seleccionada para " +
+                configuracion.tituloBacklog +
+                " no existe en " +
+                configuracion.listaCatalogo +
+                "."
+            );
+          }
+          resultado[campo.nombreInterno] = convertirValor(
+            elemento.nombre,
+            campo
+          );
+          return;
+        } else {
+          throw new Error(
+            "La columna " +
+              configuracion.tituloBacklog +
+              " debe ser Lookup, Texto u Opción."
+          );
+        }
+      }
       if (!campo || campo.soloLectura) {
         omitidos.push(clave);
         return;
@@ -529,6 +777,10 @@
 
 
       if (campo.tipo.indexOf("Lookup") === 0) {
+        if (item[clave] === null || item[clave] === "") {
+          resultado[campo.nombreInterno + "Id"] = null;
+          return;
+        }
         const idBusqueda = Number(item[clave]);
         if (!isNaN(idBusqueda) && idBusqueda > 0) {
           resultado[campo.nombreInterno + "Id"] = idBusqueda;
@@ -698,7 +950,8 @@
       credentials: "same-origin",
       headers: ODATA
     };
-    const resultados = await Promise.all([
+    const clavesRelaciones = ["app", "prioridad", "estado"];
+    const consultas = [
       solicitar(urlSitio() + "/_api/web?$select=Title,Url", opciones),
       solicitar(
         endpointLista() +
@@ -707,7 +960,7 @@
       ),
       solicitar(
         endpointLista() +
-          "/fields?$select=Title,InternalName,TypeAsString,Hidden,ReadOnlyField,Required",
+          "/fields?$select=Title,InternalName,TypeAsString,Hidden,ReadOnlyField,Required,LookupList,LookupField",
         opciones
       ),
       solicitar(
@@ -720,13 +973,39 @@
           "/fields/getbyinternalnameortitle('TipoDocumento')" +
           "?$select=Title,InternalName,TypeAsString,Choices",
         opciones
+      ),
+      solicitar(
+        endpointCatalogo(CONFIG.listaApps) + "?$select=Id,Title,ItemCount",
+        opciones
+      ),
+      solicitar(
+        endpointCatalogo(CONFIG.listaPrioridades) + "?$select=Id,Title,ItemCount",
+        opciones
+      ),
+      solicitar(
+        endpointCatalogo(CONFIG.listaEstados) + "?$select=Id,Title,ItemCount",
+        opciones
       )
-    ]);
+    ].concat(
+      clavesRelaciones.map(function (clave) {
+        const titulo = literalOData(CAMPOS[clave].tituloBacklog);
+        return solicitar(
+          endpointLista() +
+            "/fields/getbyinternalnameortitle('" +
+            titulo +
+            "')?$select=Title,InternalName,TypeAsString,Hidden,ReadOnlyField,Required,LookupList,LookupField",
+          opciones
+        );
+      })
+    );
+    const resultados = await Promise.all(consultas);
     const respuestaSitio = resultados[0];
     const respuestaLista = resultados[1];
     const respuestaCampos = resultados[2];
     const respuestaBiblioteca = resultados[3];
     const respuestaTipoDocumento = resultados[4];
+    const respuestasCatalogos = resultados.slice(5, 8);
+    const respuestasRelaciones = resultados.slice(8, 11);
 
     if (!respuestaSitio.ok) {
       throw new Error(
@@ -769,6 +1048,23 @@
               ").";
       throw new Error(motivoBiblioteca);
     }
+    const nombresCatalogos = [
+      CONFIG.listaApps,
+      CONFIG.listaPrioridades,
+      CONFIG.listaEstados
+    ];
+    const indiceCatalogoInvalido = respuestasCatalogos.findIndex(function (respuesta) {
+      return !respuesta.ok;
+    });
+    if (indiceCatalogoInvalido !== -1) {
+      throw new Error(
+        "No se pudo acceder a la lista " +
+          nombresCatalogos[indiceCatalogoInvalido] +
+          " (HTTP " +
+          respuestasCatalogos[indiceCatalogoInvalido].status +
+          ")."
+      );
+    }
 
     const datosSitio = await respuestaSitio.json();
     const datosLista = await respuestaLista.json();
@@ -777,17 +1073,34 @@
     const datosTipoDocumento = respuestaTipoDocumento.ok
       ? await respuestaTipoDocumento.json()
       : null;
-    const campos = datosCampos.d.results.map(function (campo) {
-      return {
-        titulo: campo.Title,
-        nombreInterno: campo.InternalName,
-        tipo: campo.TypeAsString,
-        oculto: campo.Hidden,
-        soloLectura: campo.ReadOnlyField,
-        obligatorio: campo.Required
+    const datosCatalogos = await Promise.all(
+      respuestasCatalogos.map(function (respuesta) {
+        return respuesta.json();
+      })
+    );
+    catalogosPorNombre = {};
+    nombresCatalogos.forEach(function (nombre, indice) {
+      catalogosPorNombre[nombre] = {
+        id: datosCatalogos[indice].d.Id,
+        titulo: datosCatalogos[indice].d.Title,
+        cantidad: datosCatalogos[indice].d.ItemCount
       };
     });
+    const campos = datosCampos.d.results.map(convertirCampoEsquema);
     esquemaLista = campos;
+    const datosRelaciones = await Promise.all(
+      respuestasRelaciones.map(async function (respuesta) {
+        return respuesta.ok ? (await respuesta.json()).d : null;
+      })
+    );
+    camposRelacionPorClave = {};
+    clavesRelaciones.forEach(function (clave, indice) {
+      if (datosRelaciones[indice]) {
+        camposRelacionPorClave[clave] = convertirCampoEsquema(
+          datosRelaciones[indice]
+        );
+      }
+    });
     const columnasFaltantes = Object.keys(CAMPOS).filter(function (clave) {
       return !resolverCampo(clave);
     }).map(function (clave) {
@@ -807,6 +1120,28 @@
         const campo = claveCampo ? resolverCampo(claveCampo) : null;
         return campo && campo.tipo.indexOf("User") !== 0;
       });
+    const columnasBusquedaInvalidas = Object.keys(CAMPOS)
+      .filter(function (clave) {
+        return CAMPOS[clave].tipo === "busqueda";
+      })
+      .filter(function (clave) {
+        const configuracion = CAMPOS[clave];
+        const campo = resolverCampo(clave);
+        const catalogo = catalogosPorNombre[configuracion.listaCatalogo];
+        if (!campo) {
+          return true;
+        }
+        if (campo.tipo.indexOf("Lookup") === 0) {
+          return (
+            !catalogo ||
+            normalizarGuid(campo.listaBusqueda) !== normalizarGuid(catalogo.id)
+          );
+        }
+        return ["Text", "Note", "Choice"].indexOf(campo.tipo) === -1;
+      })
+      .map(function (clave) {
+        return CAMPOS[clave].listaCatalogo;
+      });
 
     const advertencias = [];
     if (columnasFaltantes.length > 0) {
@@ -817,6 +1152,12 @@
     if (columnasPersonaInvalidas.length > 0) {
       advertencias.push(
         "Revisar columnas Persona: " + columnasPersonaInvalidas.join(", ")
+      );
+    }
+    if (columnasBusquedaInvalidas.length > 0) {
+      advertencias.push(
+        "Revisar las columnas de catálogo de Backlog relacionadas con: " +
+          columnasBusquedaInvalidas.join(", ")
       );
     }
     if (!respuestaTipoDocumento.ok) {
@@ -847,8 +1188,10 @@
         ? datosTipoDocumento.d
         : null,
       campos: campos,
+      catalogos: catalogosPorNombre,
       columnasFaltantes: columnasFaltantes,
       columnasPersonaInvalidas: columnasPersonaInvalidas,
+      columnasBusquedaInvalidas: columnasBusquedaInvalidas,
       advertencias: advertencias,
       urlLista:
         urlSitio() + "/Lists/" + encodeURIComponent(CONFIG.lista) + "/AllItems.aspx",
@@ -1303,7 +1646,43 @@
         (detalle ? ": " + detalle : ".")
       );
     }
-    return obtenerPorId(id);
+    const actualizado = await obtenerPorId(id);
+    if (cambios.prioridad !== undefined) {
+      const campoPrioridad = resolverCampo("prioridad");
+      const esLookupPrioridad =
+        campoPrioridad && campoPrioridad.tipo.indexOf("Lookup") === 0;
+      const elementoPrioridad =
+        cambios.prioridad === null || cambios.prioridad === ""
+          ? null
+          : buscarElementoCatalogo(
+              CONFIG.listaPrioridades,
+              cambios.prioridad
+            );
+      const prioridadEsperada = esLookupPrioridad
+        ? elementoPrioridad
+          ? Number(elementoPrioridad.id)
+          : null
+        : elementoPrioridad
+          ? elementoPrioridad.nombre
+          : "";
+      const prioridadGuardada = esLookupPrioridad
+        ? actualizado.prioridadId == null
+          ? null
+          : Number(actualizado.prioridadId)
+        : String(actualizado.prioridad || "").trim();
+      ultimoDiagnosticoEscritura.prioridad = {
+        esperada: prioridadEsperada,
+        guardada: prioridadGuardada,
+        tipo: campoPrioridad ? campoPrioridad.tipo : null,
+        columna: campoPrioridad ? campoPrioridad.nombreInterno : null
+      };
+      if (prioridadEsperada !== prioridadGuardada) {
+        throw new Error(
+          "SharePoint actualizó el requerimiento, pero la prioridad guardada no coincide con la seleccionada."
+        );
+      }
+    }
+    return actualizado;
   }
 
   async function reciclarArchivo(urlArchivo) {
@@ -1603,6 +1982,7 @@ async function obtenerDatosIndicadores() {
     esAdministrador: esAdministrador,
     verificarConexion: verificarConexion,
     obtenerTiposDocumento: obtenerTiposDocumento,
+    obtenerCatalogos: obtenerCatalogos,
     obtenerTodos: obtenerTodos,
     obtenerDatosIndicadores: obtenerDatosIndicadores,
     obtenerPorId: obtenerPorId,

@@ -6,7 +6,7 @@
   <meta name="description" content="Bit&#225;cora de requerimientos de Apps Colombia integrada con SharePoint Online.">
   <title>Bit&#225;cora | Backlog </title>
   <link rel="stylesheet"
-    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260731.37" />
+    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260731.40" />
 </head>
 <body>
   <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
@@ -389,19 +389,7 @@ Resumen operativo
               <div class="form-group">
                 <label for="app">APP *</label>
                 <select id="app" required>
-                  <option value="">Seleccione una aplicaci&#243;n</option>
-                  <option>Sem&#225;foro Web</option>
-                  <option>Monitor Master</option>
-                  <option>Automatizaciones</option>
-                  <option>Incidentes Mayores</option>
-                  <option>Kibana</option>
-                  <option>TalentIA</option>
-                  <option>Convocatorias</option>
-                  <option>Dynatrace</option>
-                  <option>Salesforce</option>
-                  <option>Gitea</option>
-                  <option>Timex</option>
-                  <option>SharePoint</option>
+                  <option value="">Cargando aplicaciones&#8230;</option>
                 </select>
               </div>
               <div class="form-group">
@@ -495,7 +483,9 @@ Resumen operativo
               </div>
               <div class="form-group">
                 <label for="estado">Estado inicial</label>
-                <input type="text" id="estado" readonly>
+                <select id="estado" disabled>
+                  <option value="">Cargando estados&#8230;</option>
+                </select>
               </div>
               <div class="form-group">
                 <label for="fechaSolicitud">Fecha de solicitud</label>
@@ -527,8 +517,7 @@ Resumen operativo
               <div class="form-group">
                 <label for="prioridad">Prioridad</label>
                 <select id="prioridad">
-                  <option value="">Sin definir</option>
-                  <option>Baja</option><option>Media</option><option>Alta</option><option>Cr&#237;tica</option>
+                  <option value="">Cargando prioridades&#8230;</option>
                 </select>
               </div>
               <div class="form-group">
@@ -536,19 +525,16 @@ Resumen operativo
                 <input type="date" id="fechaEntrega">
               </div>
               <div class="form-group">
-                <label for="complejidad">Complejidad</label>
-                <select id="complejidad">
-                  <option value="">Sin definir</option>
-                  <option>Baja</option><option>Media</option><option>Alta</option>
-                </select>
+                <label for="fechaCierre">F.E cierre</label>
+                <input type="date" id="fechaCierre">
               </div>
               <div class="form-group">
                 <label for="fechaPAP">F.E PAP</label>
                 <input type="date" id="fechaPAP">
               </div>
-              <div class="form-group">
-                <label for="fechaCierre">F.E cierre</label>
-                <input type="date" id="fechaCierre">
+              <div class="form-group full">
+                <label for="complejidad">Complejidad</label>
+                <textarea id="complejidad" rows="4" maxlength="500" placeholder="Ingrese la complejidad"></textarea>
               </div>
             </div>
           </section>
@@ -800,9 +786,9 @@ Resumen operativo
   </div>
 
   <!-- Orden MVC: el Controlador se carga al final porque depende de Modelo y Vista. -->
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260731.36"></script>
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260731.36"></script>
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260731.36"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260731.48"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260731.38"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260731.48"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>

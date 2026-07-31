@@ -1707,11 +1707,20 @@ opacity:.9;
   gap: 6px;
 }
 
+.sp-library-edit .sp-library-row {
+  grid-template-columns: 22px minmax(140px, 1fr) 116px 128px 106px;
+}
+
 .sp-file-action {
   display: inline-grid;
   width: 28px;
+  min-width: 28px;
+  max-width: 28px;
   height: 28px;
+  flex: 0 0 28px;
   place-items: center;
+  box-sizing: border-box;
+  padding: 0;
   border: 1px solid #d6e0ed;
   border-radius: 6px;
   background: #fff;
@@ -1735,9 +1744,12 @@ opacity:.9;
 }
 
 .sp-file-delete {
-  padding: 0;
   color: #c92a2a;
   cursor: pointer;
+}
+
+.sp-library-edit .sp-file-delete {
+  margin: 0 !important;
 }
 
 .sp-file-delete:hover,

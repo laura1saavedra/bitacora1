@@ -14,6 +14,7 @@
   let documentoObservadoSharePoint = null;
   // Estado temporal de formularios, edición y selección de usuarios.
   let requerimientoEnEdicion = null;
+  let archivosEliminadosEdicion = [];
   let origenEdicion = "mis";
   // Usuarios seleccionados para el campo Solicitado por
   let usuariosSeleccionados = [];
@@ -46,6 +47,11 @@
   let archivosDetalleSeleccionados = [];
   const tiposDocumentoDetalleSeleccionados = new Map();
   let esAdministradorSesion = false;
+  let catalogos = {
+    apps: [],
+    prioridades: [],
+    estados: []
+  };
 
   // Elementos del contenedor clásico de SharePoint que se ajustan únicamente
   // en modo de visualización; el modo de edición conserva sus herramientas.
@@ -279,11 +285,63 @@
     Vista.configurarAcceso(esAdministradorSesion);
     const conectado = await comprobarConexion();
     if (conectado) {
+      await cargarCatalogos();
       await cargarTiposDocumento();
       await cargarDashboard();
     } else {
       Vista.renderizarTarjetas([]);
       Vista.renderizarTabla([]);
+    }
+  }
+
+  function poblarSelectorCatalogo(idCampo, elementos, textoVacio) {
+    const campo = document.getElementById(idCampo);
+    if (!campo) {
+      return;
+    }
+    campo.replaceChildren();
+    campo.add(new Option(textoVacio, ""));
+    elementos.forEach(function (elemento) {
+      campo.add(new Option(elemento.nombre, String(elemento.id)));
+    });
+  }
+
+  async function cargarCatalogos() {
+    try {
+      catalogos = await Modelo.obtenerCatalogos();
+      poblarSelectorCatalogo(
+        "app",
+        catalogos.apps,
+        "Seleccione una aplicación"
+      );
+      poblarSelectorCatalogo(
+        "prioridad",
+        catalogos.prioridades,
+        "Sin definir"
+      );
+      poblarSelectorCatalogo(
+        "estado",
+        catalogos.estados,
+        "Seleccione un estado"
+      );
+      global.BitacoraDiagnosticoCatalogos = {
+        origen: "SharePoint",
+        listas: {
+          CatalogoAPP: catalogos.apps.length,
+          CatalogoPrioridades: catalogos.prioridades.length,
+          CatalogoEstados: catalogos.estados.length
+        }
+      };
+    } catch (error) {
+      catalogos = { apps: [], prioridades: [], estados: [] };
+      poblarSelectorCatalogo("app", [], "No se pudieron cargar las aplicaciones");
+      poblarSelectorCatalogo("prioridad", [], "No se pudieron cargar las prioridades");
+      poblarSelectorCatalogo("estado", [], "No se pudieron cargar los estados");
+      global.BitacoraDiagnosticoCatalogos = {
+        origen: "SharePoint",
+        error: error.message
+      };
+      console.error("Carga de catálogos de SharePoint:", error);
     }
   }
 
@@ -1178,6 +1236,7 @@ if(graficaResponsables){
 
   async function prepararFormulario() {
     requerimientoEnEdicion = null;
+    archivosEliminadosEdicion = [];
     document.getElementById("modo-formulario").textContent = "NUEVA SOLICITUD";
     document.getElementById("titulo-crear").textContent = "Registrar requerimiento";
     document.getElementById("subtitulo-formulario").textContent =
@@ -1186,7 +1245,7 @@ if(graficaResponsables){
     document.getElementById("btn-limpiar").hidden = false;
     document.getElementById("campos-administrativos").hidden = true;
     document.getElementById("id").readOnly = true;
-    document.getElementById("estado").readOnly = true;
+    document.getElementById("estado").disabled = true;
     document.getElementById("fechaSolicitud").readOnly = true;
     document.getElementById("buscarUsuario").hidden = false;
     document.getElementById("buscarUsuario").disabled = false;
@@ -1219,7 +1278,7 @@ if(graficaResponsables){
     document.getElementById("solicitadoPor").value =
       Modelo.usuarioActual().nombre;
 
-    document.getElementById("estado").value = "Pendiente";
+    establecerValorCatalogo("estado", catalogos.estados, null, "Pendiente");
     document.getElementById("fechaSolicitud").value = fechaActual();
     limpiarClasificacionArchivos();
     usuariosSeleccionados = [];
@@ -1289,6 +1348,7 @@ if(graficaResponsables){
 
       origenEdicion = origenFinal;
       requerimientoEnEdicion = req;
+      archivosEliminadosEdicion = [];
       document.getElementById("modo-formulario").textContent =
         "EDICI\u00d3N DE SOLICITUD";
       document.getElementById("titulo-crear").textContent =
@@ -1298,19 +1358,24 @@ if(graficaResponsables){
       document.getElementById("btn-guardar").textContent = "Guardar cambios";
       document.getElementById("btn-limpiar").hidden = true;
       document.getElementById("campos-administrativos").hidden = false;
-      document.getElementById("estado").readOnly = false;
+      document.getElementById("estado").disabled = false;
       document.getElementById("buscarUsuario").value = "";
       document.getElementById("buscarUsuario").hidden = true;
       document.getElementById("buscarUsuario").disabled = true;
       limpiarClasificacionArchivos();
       document.getElementById("id").value = req.id || "";
-      establecerValorSeleccion("app", req.app);
+      establecerValorCatalogo("app", catalogos.apps, req.appId, req.app);
       establecerValorSeleccion("tipoServicio", req.tipoServicio);
       document.getElementById("casoOrigen").value = req.casoOrigen || "";
       document.getElementById("asunto").value = req.asunto || "";
       document.getElementById("descripcion").value = req.descripcion || "";
       document.getElementById("solicitadoPor").value = req.solicitadoPor || "";
-      document.getElementById("estado").value = req.estado || "";
+      establecerValorCatalogo(
+        "estado",
+        catalogos.estados,
+        req.estadoId,
+        req.estado
+      );
       document.getElementById("fechaSolicitud").value =
         Vista.formatearFecha(req.fechaSolicitud);
       document.getElementById("comentarios").value = String(
@@ -1320,10 +1385,16 @@ if(graficaResponsables){
         req.responsableCorreo || req.responsable || "";
       document.getElementById("mentor").value =
         req.mentorCorreo || req.mentor || "";
-      establecerValorSeleccion("prioridad", req.prioridad);
+      establecerValorCatalogo(
+        "prioridad",
+        catalogos.prioridades,
+        req.prioridadId,
+        req.prioridad
+      );
       document.getElementById("fechaEntrega").value =
         fechaParaCalendario(req.fechaEntrega);
-      establecerValorSeleccion("complejidad", req.complejidad);
+      document.getElementById("complejidad").value =
+        req.complejidad || "";
       document.getElementById("fechaPAP").value =
         fechaParaCalendario(req.fechaPAP);
       document.getElementById("fechaCierre").value =
@@ -1375,6 +1446,7 @@ if(graficaResponsables){
     boton.disabled = true;
     try {
       await Modelo.reciclarArchivo(url);
+      archivosEliminadosEdicion.push(nombre);
       requerimientoEnEdicion =
         await Modelo.obtenerPorId(requerimientoEnEdicion.id);
       Vista.renderizarArchivosFormulario(
@@ -1412,6 +1484,26 @@ if(graficaResponsables){
       campo.add(new Option(texto, texto));
     }
     campo.value = texto;
+  }
+
+  function establecerValorCatalogo(idCampo, elementos, idValor, nombreValor) {
+    const campo = document.getElementById(idCampo);
+    if (!campo) {
+      return;
+    }
+    const id = Number(idValor);
+    let elemento = !isNaN(id) && id > 0
+      ? elementos.find(function (opcion) {
+          return Number(opcion.id) === id;
+        })
+      : null;
+    if (!elemento && nombreValor) {
+      const nombreNormalizado = String(nombreValor).trim().toLowerCase();
+      elemento = elementos.find(function (opcion) {
+        return String(opcion.nombre).trim().toLowerCase() === nombreNormalizado;
+      });
+    }
+    campo.value = elemento ? String(elemento.id) : "";
   }
 
   function fechaParaCalendario(valor) {
@@ -1465,7 +1557,7 @@ if(graficaResponsables){
       prioridad: document.getElementById("prioridad").value,
       fechaSolicitud: document.getElementById("fechaSolicitud").value.trim(),
       fechaEntrega: document.getElementById("fechaEntrega").value.trim(),
-      complejidad: document.getElementById("complejidad").value,
+      complejidad: document.getElementById("complejidad").value.trim(),
       fechaPAP: document.getElementById("fechaPAP").value.trim(),
       fechaCierre: document.getElementById("fechaCierre").value.trim()
     };
@@ -2271,6 +2363,7 @@ async function buscarUsuarios() {
           }
         );
         requerimientoEnEdicion = null;
+        archivosEliminadosEdicion = [];
         if (
           await mostrarErroresCarga(
             resultadoArchivos,
@@ -2964,9 +3057,28 @@ if(btnLimpiarIndicadores){
       });
     document
       .getElementById("btn-cancelar")
-      .addEventListener("click", function () {
+      .addEventListener("click", async function () {
         if (requerimientoEnEdicion) {
+          if (archivosEliminadosEdicion.length > 0) {
+            const cantidad = archivosEliminadosEdicion.length;
+            await mostrarAlerta({
+              icon: "warning",
+              title:
+                cantidad === 1
+                  ? "Archivo eliminado durante la edici\u00f3n"
+                  : "Archivos eliminados durante la edici\u00f3n",
+              text:
+                cantidad === 1
+                  ? "Has eliminado el archivo \"" +
+                    archivosEliminadosEdicion[0] +
+                    "\". Aunque canceles el formulario, este archivo ya no aparecer\u00e1 en el requerimiento."
+                  : "Has eliminado " +
+                    cantidad +
+                    " archivos. Aunque canceles el formulario, estos archivos ya no aparecer\u00e1n en el requerimiento."
+            });
+          }
           requerimientoEnEdicion = null;
+          archivosEliminadosEdicion = [];
           if (origenEdicion === "dashboard") {
             Vista.mostrarDashboard();
           } else {

@@ -1039,7 +1039,7 @@ function renderizarGestion(datos, paginacion) {
       .join("");
 
     contenedor.innerHTML =
-      '<div class="sp-library" role="table" aria-label="Archivos adjuntos existentes">' +
+      '<div class="sp-library sp-library-edit" role="table" aria-label="Archivos adjuntos existentes">' +
       '<div class="sp-library-row sp-library-header" role="row">' +
       '<span aria-hidden="true"></span>' +
       '<strong class="sp-library-name">Nombre</strong>' +
