@@ -11,11 +11,14 @@
   let observadorChromeSharePoint = null;
   let documentoObservadoSharePoint = null;
   let requerimientoEnEdicion = null;
+  let origenEdicion = "mis";
   // Usuarios seleccionados para el campo Solicitado por
   let usuariosSeleccionados = [];
   let requerimientosPropios = [];
   let indicadoresEstados = [];
   let indicadoresResponsables = [];
+  let graficaEstados = null;
+  let graficaResponsables = null;
   let paginaMisRequerimientos = 1;
   let paginaBacklog = 1;
   let requerimientosGestion = [];
@@ -361,7 +364,6 @@
     try {
 
       requerimientos = (await Modelo.obtenerTodos()).reverse();
-      Vista.renderizarTarjetas(requerimientos);
       Vista.renderizarFiltros(requerimientos);
       paginaBacklog = 1;
       renderizarPaginaBacklog();
@@ -383,9 +385,76 @@
 
 async function cargarIndicadores(){
 
-    const datos = await Modelo.obtenerDatosIndicadores();
+    let datos = 
+    await Modelo.obtenerDatosIndicadores();
+
+    console.log("DATOS FILTRO FECHA:", datos);
+
+const fechaInicio =
+document.getElementById("fechaInicioIndicadores")?.value;
 
 
+const fechaFin =
+document.getElementById("fechaFinIndicadores")?.value;
+
+console.log("FECHA INICIO INPUT:", fechaInicio);
+console.log("FECHA FIN INPUT:", fechaFin);
+
+
+
+if(fechaInicio && fechaFin){
+
+    const inicio = new Date(fechaInicio);
+    inicio.setHours(0,0,0,0);
+
+
+    const fin = new Date(fechaFin);
+    fin.setHours(23,59,59,999);
+
+
+
+ datos = datos.filter(function(req){
+
+    const fechaTexto = req.fechaSolicitud;
+
+    console.log(
+        "FECHA REQUERIMIENTO:",
+        fechaTexto
+    );
+
+
+    if(!fechaTexto){
+        return false;
+    }
+
+
+    const fecha = new Date(fechaTexto);
+
+
+    if(isNaN(fecha)){
+        console.log(
+            "Fecha inválida:",
+            fechaTexto
+        );
+
+        return false;
+    }
+
+
+    fecha.setHours(0,0,0,0);
+
+
+    return (
+        fecha >= inicio &&
+        fecha <= fin
+    );
+
+});
+console.log(
+    "DATOS DESPUES DEL FILTRO:",
+    datos
+);
+}
    // =======================================
    // ESTADOS FIJOS DEL FLUJO DE TRABAJO
     // =======================================
@@ -396,9 +465,9 @@ async function cargarIndicadores(){
 
 const estadosFlujo = [
     "Pendiente",
-    "En pruebas",
-    "Esperando cierre usuario",
-    "Esperando documentación usuario",
+    "Pruebas",
+    "E.Cierre ",
+    "E.Documentos",
     "Finalizado"
 ];
 
@@ -510,7 +579,7 @@ const kpiPendientes =
 
 
 const kpiFinalizados =
-    document.getElementById("kpi-Finalizados");
+    document.getElementById("kpi-finalizados");
 
 
 
@@ -556,6 +625,19 @@ renderizarResumenIndicadores();
 
 function renderizarGraficasIndicadores(){
 
+
+
+    if(graficaEstados){
+        graficaEstados.destroy();
+    }
+
+
+    if(graficaResponsables){
+        graficaResponsables.destroy();
+    }
+
+
+   
     const canvasEstados =
         document.getElementById("graficoEstados");
 
@@ -563,6 +645,20 @@ function renderizarGraficasIndicadores(){
     const canvasResponsables =
         document.getElementById("graficoResponsables");
 
+// destruir gráficas anteriores antes de crear nuevas
+
+if(graficaEstados){
+
+    graficaEstados.destroy();
+
+}
+
+
+if(graficaResponsables){
+
+    graficaResponsables.destroy();
+
+}
 
 
     if(!canvasEstados || !canvasResponsables){
@@ -582,7 +678,7 @@ function renderizarGraficasIndicadores(){
     // ===============================
 
 
-    new Chart(canvasEstados, {
+    graficaEstados = new Chart(canvasEstados, {
         type: "bar",
         data: {
             labels: indicadoresEstados.map(
@@ -600,10 +696,10 @@ function renderizarGraficasIndicadores(){
                 data: indicadoresEstados.map(
                     function(item){
                         return item.cantidad;
-                    }
-                ),
+                    }),
 
-                borderWidth:1
+                borderWidth:0,
+                borderRadius:8
             }]
         },
       options:{
@@ -619,15 +715,15 @@ function renderizarGraficasIndicadores(){
 
     scales:{
         x:{
-            ticks:{
-                autoSkip:false,
-                maxRotation:0,
-                minRotation:0,
-                font:{
-                    size:11
-                }
+        ticks:{
+            autoSkip:false,
+            maxRotation:45,
+            minRotation:45,
+            font:{
+                size:10
             }
-        },
+        }
+    },
 
         y:{
             beginAtZero:true,
@@ -644,7 +740,7 @@ function renderizarGraficasIndicadores(){
     // GRAFICA RESPONSABLES
     // ===============================
 
-    new Chart(canvasResponsables, {
+    graficaResponsables = new Chart(canvasResponsables, {
         type:"doughnut",
         data:{
             labels:
@@ -810,6 +906,7 @@ function renderizarGraficasIndicadores(){
 
   function renderizarPaginaBacklog() {
     const datosFiltrados = filtrarRequerimientos();
+    Vista.renderizarTarjetas(datosFiltrados);
     const total = datosFiltrados.length;
     const totalPaginas = Math.max(
       1,
@@ -1079,7 +1176,6 @@ function renderizarGraficasIndicadores(){
       "asunto",
       "descripcion",
       "casoOrigen",
-      "prioridad",
       "solicitadoPor",
       "estado",
       "fechaSolicitud"
@@ -1091,9 +1187,12 @@ function renderizarGraficasIndicadores(){
     });
     document.getElementById("solicitadoPor").value =
       Modelo.usuarioActual().nombre;
+
     document.getElementById("estado").value = "Pendiente";
     document.getElementById("fechaSolicitud").value = fechaActual();
     limpiarClasificacionArchivos();
+    usuariosSeleccionados = [];
+    cargarSolicitanteActual();
 
     try {
       const datos = await Modelo.obtenerTodos();
@@ -1128,7 +1227,8 @@ function renderizarGraficasIndicadores(){
       });
   }
 
-  async function editarRequerimiento(id) {
+  async function editarRequerimiento(id, origen) {
+    const origenFinal = origen === "dashboard" ? "dashboard" : "mis";
     try {
       const req = await Modelo.obtenerPorId(id);
       if (!req) {
@@ -1139,7 +1239,7 @@ function renderizarGraficasIndicadores(){
         });
         return;
       }
-      if (!esRequerimientoPropio(req)) {
+      if (origenFinal !== "dashboard" && !esRequerimientoPropio(req)) {
         await mostrarAlerta({
           icon: "warning",
           title: "Edici\u00f3n no permitida",
@@ -1148,6 +1248,7 @@ function renderizarGraficasIndicadores(){
         return;
       }
 
+      origenEdicion = origenFinal;
       requerimientoEnEdicion = req;
       document.getElementById("modo-formulario").textContent =
         "EDICI\u00d3N DE SOLICITUD";
@@ -1158,14 +1259,12 @@ function renderizarGraficasIndicadores(){
       document.getElementById("btn-guardar").textContent = "Guardar cambios";
       document.getElementById("btn-limpiar").hidden = true;
       limpiarClasificacionArchivos();
-
       document.getElementById("id").value = req.id || "";
       document.getElementById("app").value = req.app || "";
       document.getElementById("tipoServicio").value = req.tipoServicio || "";
       document.getElementById("casoOrigen").value = req.casoOrigen || "";
       document.getElementById("asunto").value = req.asunto || "";
       document.getElementById("descripcion").value = req.descripcion || "";
-      document.getElementById("prioridad").value = req.prioridad || "";
       document.getElementById("solicitadoPor").value = req.solicitadoPor || "";
       document.getElementById("estado").value = req.estado || "";
       document.getElementById("fechaSolicitud").value =
@@ -1191,7 +1290,6 @@ function renderizarGraficasIndicadores(){
       casoOrigen: document.getElementById("casoOrigen").value.trim(),
       solicitadoPor: document.getElementById("solicitadoPor").value.trim(),
       responsable: "No asignado",
-      prioridad: document.getElementById("prioridad").value,
       estado: document.getElementById("estado").value,
       fechaSolicitud: document.getElementById("fechaSolicitud").value
     };
@@ -1737,13 +1835,13 @@ function renderizarGraficasIndicadores(){
       });
       return false;
     }
-    if (
-      !datos.app ||
-      !datos.tipoServicio ||
-      !datos.asunto ||
-      !datos.descripcion ||
-      !datos.prioridad
-    ) {
+   if (
+ !datos.app ||
+ !datos.tipoServicio ||
+ !datos.asunto ||
+ !datos.descripcion
+)
+    {
       mostrarAlerta({
         icon: "warning",
         title: "Informaci\u00f3n incompleta",
@@ -1760,6 +1858,27 @@ function renderizarGraficasIndicadores(){
 // ------------------------------------------------------------
 // Muestra las personas elegidas en el formulario.
 // ============================================================
+function cargarSolicitanteActual(){
+
+    const usuario = Modelo.usuarioActual();
+
+
+    if(!usuario){
+        return;
+    }
+
+
+    usuariosSeleccionados = [
+        {
+            nombre: usuario.nombre,
+            correo: usuario.correo
+        }
+    ];
+
+
+    renderizarUsuariosSeleccionados();
+
+}
 
 function renderizarUsuariosSeleccionados() {
 
@@ -1946,7 +2065,11 @@ async function buscarUsuarios() {
             requerimientoActualizado.id
           )
         ) {
-          Vista.mostrarMisRequerimientos();
+          if (origenEdicion === "dashboard") {
+            Vista.mostrarDashboard();
+          } else {
+            Vista.mostrarMisRequerimientos();
+          }
           return;
         }
         await mostrarAlerta({
@@ -1956,7 +2079,11 @@ async function buscarUsuarios() {
             "Los cambios fueron guardados correctamente." +
             textoResultadoArchivos(resultadoArchivos)
         });
-        Vista.mostrarMisRequerimientos();
+        if (origenEdicion === "dashboard") {
+          Vista.mostrarDashboard();
+        } else {
+          Vista.mostrarMisRequerimientos();
+        }
       } else {
         const requerimientoCreado = await Modelo.crear(datos);
         const resultadoArchivos = await Modelo.guardarArchivosRequerimiento(
@@ -2505,14 +2632,50 @@ async function buscarUsuarios() {
     eventosRegistrados = true;
 
     const btnAgregarPersona =
-  document.getElementById("btnAgregarPersona");
+   document.getElementById("btnAgregarPersona");
 
-if (btnAgregarPersona) {
+   if (btnAgregarPersona) {
 
-  btnAgregarPersona.addEventListener(
+   btnAgregarPersona.addEventListener(
     "click",
     agregarPersona
   );
+
+// BOTON LIMPIAR FILTROS INDICADORES
+
+
+
+
+
+const btnLimpiarIndicadores =
+document.getElementById("btnLimpiarIndicadores");
+
+
+if(btnLimpiarIndicadores){
+
+    btnLimpiarIndicadores.onclick = function(e){
+
+        e.preventDefault();
+
+
+        document.getElementById(
+            "fechaInicioIndicadores"
+        ).value = "";
+
+
+        document.getElementById(
+            "fechaFinIndicadores"
+        ).value = "";
+
+
+        cargarIndicadores();
+
+
+        return false;
+
+    };
+
+}
 
 }
     document.getElementById("buscador").addEventListener("input", aplicarFiltros);
@@ -2542,10 +2705,7 @@ if (btnAgregarPersona) {
       .getElementById("btn-exportar")
       .addEventListener("click", exportarCSV);
    document
-      .getElementById("btn-actualizar")
-      .addEventListener("click", function () {
-        global.location.reload();
-      });
+
     document.querySelectorAll("[data-vista]").forEach(function (boton) {
       boton.addEventListener("click", function () {
         const vista = boton.dataset.vista;
@@ -2584,7 +2744,11 @@ if (btnAgregarPersona) {
       .addEventListener("click", function () {
         if (requerimientoEnEdicion) {
           requerimientoEnEdicion = null;
-          Vista.mostrarMisRequerimientos();
+          if (origenEdicion === "dashboard") {
+            Vista.mostrarDashboard();
+          } else {
+            Vista.mostrarMisRequerimientos();
+          }
         } else {
           Vista.mostrarDashboard();
         }
@@ -2599,6 +2763,8 @@ if (btnAgregarPersona) {
         }
         if (boton.classList.contains("view-btn")) {
           verRequerimiento(boton.dataset.id);
+        } else if (boton.classList.contains("edit-btn")) {
+          editarRequerimiento(boton.dataset.id, "dashboard");
         }
       });
 

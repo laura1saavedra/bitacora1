@@ -30,6 +30,19 @@
   let archivosAdjuntosDetalle = [];
   let paginaAdjuntosDetalle = 1;
 
+    function claseEstado(estado) {
+    const mapa = {
+      "Pendiente": "orange",
+      "En proceso": "orange",
+      "En pruebas": "teal",
+      "Esperando Documentacion Usuario": "indigo",
+      "Esperando cierre usuario": "purple",
+      "Finalizado": "green",
+      "Cancelado": "danger"
+    };
+    return mapa[estado] || "neutral";
+  }
+
   function textoSeguro(valor) {
     return String(valor == null ? "" : valor)
       .replace(/&/g, "&amp;")
@@ -181,18 +194,27 @@ function renderizarTabla(datos, paginacion) {
               '<td data-label="Solicitado por">' + textoSeguro(req.solicitadoPor) + "</td>" +
               '<td data-label="Responsable">' + textoSeguro(req.responsable || "No asignado") + "</td>" +
               '<td data-label="Prioridad">' + textoSeguro(req.prioridad) + "</td>" +
-              '<td data-label="Estado">' + textoSeguro(req.estado) + "</td>" +
+              '<td data-label="Estado"><span class="estado estado-' +
+              claseEstado(req.estado) +
+              '">' + textoSeguro(req.estado) + "</span></td>" +
               '<td data-label="F. solicitud">' +
               textoSeguro(formatearFecha(req.fechaSolicitud) || "Sin definir") +
               "</td>" +
               '<td data-label="F. cierre">' +
               textoSeguro(formatearFecha(req.fechaCierre) || "Sin definir") +
               "</td>" +
-              '<td data-label="Acciones">' +
-              '<button class="action-btn view-btn" data-id="' +
+              '<td data-label="Acciones"><div class="request-action-buttons">' +
+              '<button class="action-btn icon-action view-btn" data-id="' +
               textoSeguro(req.id) +
-              '">Ver</button>' +
-              "</td></tr>"
+              '" type="button" aria-label="Ver requerimiento ' +
+              textoSeguro(req.id) +
+              '" title="Ver detalle">' + ICONO_OJO + "</button>" +
+              '<button class="action-btn icon-action edit-btn" data-id="' +
+              textoSeguro(req.id) +
+              '" type="button" aria-label="Editar requerimiento ' +
+              textoSeguro(req.id) +
+              '" title="Editar">' + ICONO_LAPIZ + "</button>" +
+              "</div></td></tr>"
             );
           })
           .join("")
@@ -217,9 +239,8 @@ function renderizarTabla(datos, paginacion) {
 
     resumen.textContent =
       "Mostrando " +
-      paginacion.inicio +
-      "&ndash;" +
       paginacion.fin +
+      " Requerimientos " +
       " de " +
       paginacion.total;
 
@@ -298,9 +319,8 @@ function renderizarTabla(datos, paginacion) {
 
     resumen.textContent =
       "Mostrando " +
-      paginacion.inicio +
-      "\u2013" +
       paginacion.fin +
+      " Requerimientos " +
       " de " +
       paginacion.total;
 
@@ -447,9 +467,8 @@ function renderizarGestion(datos, paginacion) {
 
     resumen.textContent =
       "Mostrando " +
-      paginacion.inicio +
-      "&ndash;" +
       paginacion.fin +
+      " Requerimientos " +
       " de " +
       paginacion.total;
 
@@ -641,9 +660,8 @@ function renderizarGestion(datos, paginacion) {
     }
     resumen.textContent =
       "Mostrando " +
-      paginacion.inicio +
-      "\u2013" +
       paginacion.fin +
+      " Registros " +
       " de " +
       paginacion.total;
     const botones = paginasPaginacion(

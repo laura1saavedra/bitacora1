@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Bit&#225;cora de requerimientos de Apps Colombia integrada con SharePoint Online.">
-  <title>Bit&#225;cora | Backlog Apps Colombia</title>
+  <title>Bit&#225;cora | Backlog </title>
   <link rel="stylesheet"
     href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260729.26" />
 </head>
@@ -14,10 +14,14 @@
   <div id="bitacora-app" class="app">
     <aside class="sidebar" aria-label="Navegaci&#243;n principal">
       <div class="brand">
-        <div class="brand-mark" aria-hidden="true">B</div>
+          <div class="brand-mark">
+    <img src="../SiteAssets/Retiro%20de%20cesantias/IMG/Logo_GlobalHITSS_Desarrollando_RGB-01.png"
+         alt="HITSS">
+</div>
+
         <div>
-          <strong>Bit&#225;cora</strong>
-          <span>Apps Colombia</span>
+          <strong>BACKLOG</strong>
+          <span>Hitss</span>
         </div>
       </div>
 
@@ -82,13 +86,10 @@
         <header class="top-row">
           <div>
             <p class="eyebrow">BACKLOG APPS COLOMBIA</p>
-            <h1 id="titulo-dashboard">Bit&#225;cora de requerimientos</h1>
+            <h1 id="titulo-dashboard">Backlog de requerimientos</h1>
             <p class="subtitle">Resumen general y seguimiento de las solicitudes registradas.</p>
           </div>
           <div class="header-actions">
-            <button class="btn-secondary" id="btn-actualizar" type="button">
-              Actualizar
-            </button>
             <button class="btn-primary" id="btn-crear-requerimiento" type="button">
               Crear requerimiento
             </button>
@@ -144,32 +145,33 @@
           <div class="panel-heading">
             <div>
               <h2 id="titulo-listado">Requerimientos registrados</h2>
-              <p>Consulta, filtra y gestiona la informaci&#243;n disponible para tu rol.</p>
             </div>
           </div>
 
           <div class="filters" aria-label="Filtros del listado">
-            <label class="search" for="buscador">
-              <span aria-hidden="true">&#x2315;</span>
-              <input type="search" id="buscador" placeholder="Buscar por ID, APP, asunto o responsable">
-            </label>
-            <select class="fake-select" id="filtro-app" aria-label="Filtrar por aplicaci&#243;n">
-              <option value="">Todas las APP</option>
-            </select>
-            <select class="fake-select" id="filtro-responsable" aria-label="Filtrar por responsable">
-              <option value="">Todos los responsables</option>
-            </select>
-            <select class="fake-select" id="filtro-estado" aria-label="Filtrar por estado">
-              <option value="">Todos los estados</option>
-            </select>
-            <select class="fake-select" id="filtro-prioridad" aria-label="Filtrar por prioridad">
-              <option value="">Todas las prioridades</option>
-            </select>
-            <select class="fake-select filter-placeholder" id="filtro-extra" aria-label="Filtro adicional">
-              <option value="">M&#225;s filtros</option>
-            </select>
-            <input type="date" class="fake-select" id="filtro-fecha"
-              aria-label="Filtrar por fecha de solicitud" title="Filtrar por fecha de solicitud">
+            <div class="filters-controls">
+              <label class="search" for="buscador">
+                <span aria-hidden="true">&#x2315;</span>
+                <input type="search" id="buscador" placeholder="Buscar por ID, APP, asunto o responsable">
+              </label>
+              <select class="fake-select" id="filtro-app" aria-label="Filtrar por aplicaci&#243;n">
+                <option value="">Todas las APP</option>
+              </select>
+              <select class="fake-select" id="filtro-responsable" aria-label="Filtrar por responsable">
+                <option value="">Todos los responsables</option>
+              </select>
+              <select class="fake-select" id="filtro-estado" aria-label="Filtrar por estado">
+                <option value="">Todos los estados</option>
+              </select>
+              <select class="fake-select" id="filtro-prioridad" aria-label="Filtrar por prioridad">
+                <option value="">Todas las prioridades</option>
+              </select>
+              <select class="fake-select filter-placeholder" id="filtro-extra" aria-label="Filtro adicional">
+                <option value="">M&#225;s filtros</option>
+              </select>
+              <input type="date" class="fake-select" id="filtro-fecha"
+                aria-label="Filtrar por fecha de solicitud" title="Filtrar por fecha de solicitud">
+            </div>
             <button class="btn-link danger-link" id="btn-limpiar-filtros" type="button">&#215; Limpiar filtros</button>
             <button class="btn-export" id="btn-exportar" type="button">&#x21E9; Exportar CSV</button>
           </div>
@@ -215,17 +217,35 @@
               <p class="eyebrow">
               INDICADORES
               </p>
-
-
               <h1>
               Indicadores de flujo de trabajo
               </h1>
-
-
               <p class="subtitle">
               Analisis del estado de requerimientos y carga administrativa.
               </p>
               </div>
+<div class="filtro-indicadores">
+    <label>
+        Fecha inicio
+        <input type="date" id="fechaInicioIndicadores">
+    </label>
+    <label>
+        Fecha fin
+        <input type="date" id="fechaFinIndicadores">
+    </label>
+    <button 
+id="btnFiltrarIndicadores"
+type="button">
+    Filtrar
+</button>
+   <button 
+id="btnLimpiarIndicadores"
+type="button">
+    Limpiar
+</button>
+
+</div>
+
               <div class="kpi-container">
 
 
@@ -267,13 +287,8 @@
 </div>
 
 </header>
-
-<div class="indicadores-grid dashboard-two-columns">
-
-
+<div class="indicadores-grid ">
 <section class="panel grafica-card">
-
-
 <div class="panel-heading">
 
 <h2>
@@ -281,9 +296,8 @@ Estado de requerimientos
 </h2>
 
 <p>
-Distribución actual del backlog.
+Distribucion actual del backlog.
 </p>
-
 
 </div>
 
@@ -308,13 +322,13 @@ Requerimientos asignados por responsable.
 
 
 </section>
+</div>
 
 
 
 
 
-
-<section class="panel resumen-operativo">
+<section class="panel resumen-operativo resumen-full">
 
 
 <h2>
@@ -348,7 +362,7 @@ Resumen operativo
         <header class="top-row">
           <div>
             <p class="eyebrow" id="modo-formulario">NUEVA SOLICITUD</p>
-            <h1 id="titulo-crear">Registrar requerimiento</h1>
+            <h1 id="titulo-crear">Registrar Requerimiento</h1>
             <p class="subtitle" id="subtitulo-formulario">Los campos marcados con * son obligatorios.</p>
           </div>
         </header>
@@ -358,7 +372,7 @@ Resumen operativo
             <div class="panel-heading">
               <div>
                 <h2 id="titulo-info-general">Informaci&#243;n general</h2>
-                <p>Describe la necesidad que debe atender el equipo Apps Colombia.</p>
+                <p>Describe la necesidad que debe atender el equipo Hitss.</p>
               </div>
             </div>
             <div class="form-grid">
@@ -390,15 +404,10 @@ Resumen operativo
                   <option value="">Seleccione un tipo</option>
                   <option>Incidente</option>
                   <option>Nuevo requerimiento</option>
-                  <option>Soporte</option>
-                  <option>Mejora</option>
-                  <option>Desarrollo</option>
+                  
                 </select>
               </div>
-              <div class="form-group">
-                <label for="casoOrigen">Caso origen</label>
-                <input type="text" id="casoOrigen" placeholder="Si aplica, ingresa el n&#250;mero del requerimiento de soporte">
-              </div>
+               
               <div class="form-group full">
                 <label for="asunto">Asunto *</label>
                 <input type="text" id="asunto" maxlength="180" required placeholder="Resumen corto del requerimiento">
@@ -408,19 +417,10 @@ Resumen operativo
                 <textarea id="descripcion" rows="6" maxlength="4000" required placeholder="Describe el contexto, la necesidad y el resultado esperado"></textarea>
               </div>
               <div class="form-group">
-                <label for="prioridad">Prioridad *</label>
-                <select id="prioridad" required>
-                  <option value="">Seleccione una prioridad</option>
-                  <option value="1">1 - Cr&#237;tica</option>
-                  <option value="2">2 - Muy alta</option>
-                  <option value="3">3 - Alta</option>
-                  <option value="4">4 - Media alta</option>
-                  <option value="5">5 - Media</option>
-                  <option value="6">6 - Media baja</option>
-                  <option value="7">7 - Baja</option>
-                  <option value="8">8 - Muy baja</option>
-                </select>
-              </div>
+                <label for="casoOrigen">Caso origen</label>
+                <input type="text" id="casoOrigen" placeholder="Si aplica, ingresa el n&#250;mero del requerimiento de soporte">
+               </div>
+
               <div class="form-group full">
                 <label for="archivosAdjuntos">Archivos adjuntos</label>
                 <div class="file-field">
@@ -673,8 +673,8 @@ Resumen operativo
                   <th scope="col">Asunto</th>
                   <th scope="col">Responsable</th>
                   <th scope="col">Mentor</th>
-                  <th scope="col">F. estimada de entrega</th>
-                  <th scope="col">F. PAP</th>
+                  <th scope="col">Fecha estimada de entrega</th>
+                  <th scope="col">Fecha PAP</th>
                   <th scope="col">Estado</th>
                   <th scope="col">Observaciones</th>
                   <th scope="col">Acciones</th>
