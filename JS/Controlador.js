@@ -458,20 +458,54 @@
 // PROCESAR DATOS DE INDICADORES
 // ============================================================
 
-async function cargarIndicadores(){
+async function cargarIndicadores(fechaInicio, fechaFin){
 
-    let datos = 
-    await Modelo.obtenerDatosIndicadores();
+console.log(
+"FECHAS RECIBIDAS:",
+fechaInicio,
+fechaFin
+);
 
-    console.log("DATOS FILTRO FECHA:", datos);
-
-const fechaInicio =
-document.getElementById("fechaInicioIndicadores")?.value;
+let datos = 
+await Modelo.obtenerDatosIndicadores();
 
 
-const fechaFin =
-document.getElementById("fechaFinIndicadores")?.value;
+console.log("DATOS FILTRO FECHA:", datos);
 
+console.log(
+    "CANTIDAD INPUT FECHA INICIO:",
+    document.querySelectorAll("#fechaInicioIndicadores").length
+);
+
+
+console.log(
+    "CANTIDAD INPUT FECHA FIN:",
+    document.querySelectorAll("#fechaFinIndicadores").length
+);
+
+console.log(
+"VALOR DIRECTO INPUT:",
+document.getElementById("fechaInicioIndicadores").value,
+document.getElementById("fechaFinIndicadores").value
+);
+
+console.log("ELEMENTO FECHA INICIO:",
+document.getElementById("fechaInicioIndicadores"));
+
+console.log("ELEMENTO FECHA FIN:",
+document.getElementById("fechaFinIndicadores"));
+
+console.log(
+"VALORES FECHA:",
+fechaInicio,
+fechaFin
+);
+
+console.log(
+"VALOR INPUT FECHA:",
+fechaInicio,
+fechaFin
+);
 console.log("FECHA INICIO INPUT:", fechaInicio);
 console.log("FECHA FIN INPUT:", fechaFin);
 
@@ -486,16 +520,13 @@ if(fechaInicio && fechaFin){
     const fin = new Date(fechaFin);
     fin.setHours(23,59,59,999);
 
-
-
- datos = datos.filter(function(req){
+datos = datos.filter(function(req){
 
     const fechaTexto = req.fechaSolicitud;
-
     console.log(
-        "FECHA REQUERIMIENTO:",
-        fechaTexto
-    );
+"FECHA DEL REGISTRO:",
+fechaTexto
+);
 
 
     if(!fechaTexto){
@@ -503,28 +534,22 @@ if(fechaInicio && fechaFin){
     }
 
 
-    const fecha = new Date(fechaTexto);
+    const fechaFiltro = new Date(fechaTexto);
 
 
-    if(isNaN(fecha)){
-        console.log(
-            "Fecha inv\u00e1lida:",
-            fechaTexto
-        );
-
+    if(isNaN(fechaFiltro)){
         return false;
     }
 
 
-    fecha.setHours(0,0,0,0);
+    fechaFiltro.setHours(0,0,0,0);
 
 
-    return (
-        fecha >= inicio &&
-        fecha <= fin
-    );
+    return fechaFiltro >= inicio && fechaFiltro <= fin;
 
 });
+
+ 
 console.log(
     "DATOS DESPUES DEL FILTRO:",
     datos
@@ -3090,9 +3115,11 @@ async function buscarUsuarios() {
   }
 
   function registrarEventos() {
+    console.log("ENTRO A REGISTRAR EVENTOS");
     if (eventosRegistrados) {
       return;
     }
+    
     eventosRegistrados = true;
 
     const btnAgregarPersona =
@@ -3100,15 +3127,52 @@ async function buscarUsuarios() {
 
    if (btnAgregarPersona) {
 
+
    btnAgregarPersona.addEventListener(
     "click",
     agregarPersona
-  );
+   );
+  }
 
-// BOTON LIMPIAR FILTROS INDICADORES
+     // BOTON LIMPIAR FILTROS INDICADORES
+  document.addEventListener(
+    "click",
+    function(e){
+     if(e.target && e.target.id === "btnFiltrarIndicadores"){
+
+            const inicio =
+            document.getElementById(
+                "fechaInicioIndicadores"
+            ).value;
+
+
+            const fin =
+            document.getElementById(
+                "fechaFinIndicadores"
+            ).value;
 
 
 
+
+
+            console.log(
+                "FECHAS BOTON:",
+                inicio,
+                fin
+            );
+
+
+
+
+
+            cargarIndicadores(
+                inicio,
+                fin
+            );
+        }
+    }
+
+);
 
 
 const btnLimpiarIndicadores =
@@ -3117,29 +3181,25 @@ document.getElementById("btnLimpiarIndicadores");
 
 if(btnLimpiarIndicadores){
 
-    btnLimpiarIndicadores.onclick = function(e){
+ btnLimpiarIndicadores.onclick = function(){
 
-        e.preventDefault();
-
-
-        document.getElementById(
-            "fechaInicioIndicadores"
-        ).value = "";
+    document.getElementById(
+        "fechaInicioIndicadores"
+    ).value = "";
 
 
-        document.getElementById(
-            "fechaFinIndicadores"
-        ).value = "";
+    document.getElementById(
+        "fechaFinIndicadores"
+    ).value = "";
 
 
-        cargarIndicadores();
+    cargarIndicadores("", "");
+
+    return false;
+
+};
 
 
-        return false;
-
-    };
-
-}
 
 }
     document.getElementById("buscador").addEventListener("input", aplicarFiltros);

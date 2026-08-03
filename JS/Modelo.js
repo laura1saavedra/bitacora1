@@ -2025,19 +2025,19 @@ async function buscarUsuariosMicrosoft(texto) {
 async function obtenerDatosIndicadores() {
 
     const datos = await obtenerTodos();
+      console.log("DATOS COMPLETOS SHAREPOINT:", datos);
+return datos.map(function(req){
 
-    return datos.map(function(req){
+    return {
 
-        return {
-
-            estado: req.estado || "Sin estado",
-
-            responsable:
-                req.responsable || "No asignado"
-
-        };
-
-    });
+        estado: req.estado || "Sin estado",
+        responsable:
+            req.responsable || "No asignado",
+        fechaSolicitud:
+            req.fechaSolicitud || ""
+    };
+});
+   
 
 }
 
