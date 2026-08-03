@@ -35,6 +35,14 @@
     '<path d="M9 7V4h6v3"></path>' +
     '<path d="m6 7 1 13h10l1-13"></path>' +
     '<path d="M10 11v5M14 11v5"></path></svg>';
+  const ICONO_CHECK =
+    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path d="m4 12.5 5 5L20 6.5"></path></svg>';
+  const ICONO_X =
+    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path d="m5 5 14 14"></path>' +
+    '<path d="m19 5-14 14"></path></svg>';
+
   const ADJUNTOS_POR_PAGINA = 4;
   let archivosAdjuntosDetalle = [];
   let paginaAdjuntosDetalle = 1;
@@ -42,16 +50,21 @@
 
   // Convierte estados funcionales en variantes visuales conocidas por el CSS.
   function claseEstado(estado) {
+
     const mapa = {
-      "Pendiente": "orange",
-      "En proceso": "orange",
-      "En pruebas": "teal",
-      "Esperando Documentacion Usuario": "indigo",
-      "Esperando cierre usuario": "purple",
-      "Finalizado": "green",
-      "Cancelado": "danger"
+      "pendiente": "orange",
+      "en proceso": "orange",
+      "pruebas": "teal",
+      "en pruebas": "teal",
+      "esperando documentación usuario": "indigo",
+      "esperando documentacion usuario": "indigo",
+      "esperando cierre usuario": "purple",
+      "finalizados": "green",
+      "finalizado": "green",
+      "cancelado": "danger"
     };
-    return mapa[estado] || "neutral";
+    const clave = String(estado || "").trim().toLowerCase();
+    return mapa[clave] || "neutral";
   }
 
   // Todo valor dinámico insertado mediante innerHTML debe pasar por esta función.
@@ -194,23 +207,36 @@
   // --------------------------------------------------------------------------
   // Tableros, tablas y paginación
   // --------------------------------------------------------------------------
+  function estadoCoincide(valorEstado, variantes) {
+    // Compara ignorando mayusculas/minusculas y espacios de sobra, para no
+    // depender de que el texto en CatalogoEstados sea IDENTICO caracter por
+    // caracter al escrito aqui.
+    const valor = String(valorEstado || "").trim().toLowerCase();
+    return variantes.some(function (variante) {
+      return valor === variante.toLowerCase();
+    });
+  }
+
   function renderizarTarjetas(datos) {
     const valores = {
       "total-requerimientos": datos.length,
       "total-pendientes": datos.filter(function (item) {
-        return item.estado === "Pendiente";
+        return estadoCoincide(item.estado, ["Pendiente"]);
       }).length,
       "total-en-pruebas": datos.filter(function (item) {
-        return item.estado === "En pruebas";
+        return estadoCoincide(item.estado, ["Pruebas", "En pruebas"]);
       }).length,
       "total-pruebas": datos.filter(function (item) {
-        return item.estado === "Esperando Documentacion Usuario";
+        return estadoCoincide(item.estado, [
+          "Esperando documentación usuario",
+          "Esperando Documentacion Usuario"
+        ]);
       }).length,
       "total-cierre-usuario": datos.filter(function (item) {
-        return item.estado === "Esperando cierre usuario";
+        return estadoCoincide(item.estado, ["Esperando cierre usuario"]);
       }).length,
       "total-finalizados": datos.filter(function (item) {
-        return item.estado === "Finalizado";
+        return estadoCoincide(item.estado, ["Finalizados", "Finalizado"]);
       }).length
     };
     Object.keys(valores).forEach(function (id) {
@@ -439,43 +465,67 @@ function renderizarGestion(datos, paginacion) {
     cuerpo.innerHTML = datos.length
       ? datos
           .map(function (req) {
+            const comentarioActual = String(req.comentarios || "");
             return (
               '<tr data-id="' + textoSeguro(req.id) + '">' +
               '<td data-label="ID req.">' + textoSeguro(req.id) + "</td>" +
               '<td data-label="Asunto">' + textoSeguro(req.asunto) + "</td>" +
-              '<td data-label="Responsable"><input class="gestion-responsable" type="text" value="' +
+              '<td data-label="Solicitado por">' + textoSeguro(req.solicitadoPor) + "</td>" +
+              '<td data-label="Responsable"><div class="gestion-campo-autocompletar">' +
+              '<input class="gestion-responsable" type="text" value="' +
               textoSeguro(req.responsable) +
               '" data-original="' +
               textoSeguro(req.responsable) +
               '" placeholder="Correo del responsable" aria-label="Responsable del requerimiento ' +
               textoSeguro(req.id) +
-              '"></td>' +
-              '<td data-label="Mentor"><input class="gestion-mentor" type="text" value="' +
+              '" readonly>' +
+              '<div class="gestion-sugerencias" hidden></div></div></td>' +
+              '<td data-label="Mentor"><div class="gestion-campo-autocompletar">' +
+              '<input class="gestion-mentor" type="text" value="' +
               textoSeguro(req.mentor) +
               '" data-original="' +
               textoSeguro(req.mentor) +
               '" placeholder="Correo del mentor" aria-label="Mentor del requerimiento ' +
               textoSeguro(req.id) +
-              '"></td>' +
-              '<td data-label="Fecha estimada de entrega">' + textoSeguro(req.fechaEntrega || "Sin definir") + "</td>" +
-              '<td data-label="Fecha PAP">' + textoSeguro(req.fechaPAP || "Sin definir") + "</td>" +
-              '<td data-label="Estado"><select class="gestion-estado">' +
-              opcionesEstado(req.estado) +
-              "</select></td>" +
-              '<td data-label="Observaciones"><input class="gestion-comentarios" type="text" value="' +
-              textoSeguro(req.comentarios) +
-              '" aria-label="Observaciones del requerimiento ' +
+              '" readonly>' +
+              '<div class="gestion-sugerencias" hidden></div></div></td>' +
+              '<td data-label="F.E. Entrega">' + textoSeguro(req.fechaEntrega || "Sin definir") + "</td>" +
+              '<td data-label="Estado"><span class="estado estado-' +
+              claseEstado(req.estado) +
+              '">' + textoSeguro(req.estado) + "</span></td>" +
+              '<td data-label="Observaciones">' +
+              '<input class="gestion-comentarios" type="text" value="' +
+              textoSeguro(comentarioActual) +
+              '" data-original="' +
+              textoSeguro(comentarioActual) +
+              '" maxlength="500" aria-label="Observaciones del requerimiento ' +
               textoSeguro(req.id) +
-              '"></td>' +
+              '" readonly>' +
+              '<span class="gestion-contador-caracteres">' +
+              comentarioActual.length +
+              "/500</span></td>" +
               '<td data-label="Acciones"><div class="request-action-buttons">' +
               '<button class="action-btn icon-action view-btn" data-id="' +
               textoSeguro(req.id) +
               '" type="button" aria-label="Ver requerimiento ' +
               textoSeguro(req.id) +
               '" title="Ver detalle">' + ICONO_OJO + "</button>" +
-              '<button class="action-btn save-btn" data-id="' +
+              '<button class="action-btn icon-action edit-btn-gestion" data-id="' +
               textoSeguro(req.id) +
-              '">Guardar</button></div></td></tr>'
+              '" type="button" aria-label="Editar requerimiento ' +
+              textoSeguro(req.id) +
+              '" title="Editar">' + ICONO_LAPIZ + "</button>" +
+              '<button class="action-btn icon-action confirm-btn-gestion" data-id="' +
+              textoSeguro(req.id) +
+              '" type="button" aria-label="Guardar requerimiento ' +
+              textoSeguro(req.id) +
+              '" title="Guardar" hidden>' + ICONO_CHECK + "</button>" +
+              '<button class="action-btn icon-action cancel-btn-gestion" data-id="' +
+              textoSeguro(req.id) +
+              '" type="button" aria-label="Cancelar edición de ' +
+              textoSeguro(req.id) +
+              '" title="Cancelar" hidden>' + ICONO_X + "</button>" +
+              "</div></td></tr>"
             );
           })
           .join("")
@@ -484,7 +534,6 @@ function renderizarGestion(datos, paginacion) {
       renderizarPaginacionGestion(paginacion);
     }
   }
-
   function renderizarPaginacionGestion(paginacion) {
     const pie = document.getElementById("pie-paginacion-gestion");
     const resumen = document.getElementById("resumen-paginacion-gestion");
@@ -542,28 +591,48 @@ function renderizarGestion(datos, paginacion) {
     controles.innerHTML = anterior + paginas + siguiente;
   }
 
-  function opcionesEstado(actual) {
-    return [
-      "Pendiente",
-      "En proceso",
-      "En pruebas",
-      "Esperando Documentacion Usuario",
-      "Esperando cierre usuario",
-      "Finalizado",
-      "Cancelado"
-    ]
-      .map(function (estado) {
+  function mostrarSugerenciasGestion(campo, personas) {
+    const contenedor = campo.closest(".gestion-campo-autocompletar");
+    const lista = contenedor
+      ? contenedor.querySelector(".gestion-sugerencias")
+      : null;
+    if (!lista) {
+      return;
+    }
+    if (!personas || !personas.length) {
+      ocultarSugerenciasGestion(campo);
+      return;
+    }
+    lista.innerHTML = personas
+      .map(function (persona) {
         return (
-          '<option value="' +
-          textoSeguro(estado) +
-          '"' +
-          (estado === actual ? " selected" : "") +
-          ">" +
-          textoSeguro(estado) +
-          "</option>"
+          '<button type="button" class="gestion-sugerencia-item" data-id="' +
+          textoSeguro(persona.id) +
+          '" data-nombre="' +
+          textoSeguro(persona.nombre) +
+          '">' +
+          textoSeguro(persona.nombre) +
+          (persona.correo
+            ? '<span class="gestion-sugerencia-correo">' +
+              textoSeguro(persona.correo) +
+              "</span>"
+            : "") +
+          "</button>"
         );
       })
       .join("");
+    lista.hidden = false;
+  }
+
+  function ocultarSugerenciasGestion(campo) {
+    const contenedor = campo.closest(".gestion-campo-autocompletar");
+    const lista = contenedor
+      ? contenedor.querySelector(".gestion-sugerencias")
+      : null;
+    if (lista) {
+      lista.hidden = true;
+      lista.innerHTML = "";
+    }
   }
 
   function renderizarFiltros(datos) {
@@ -1147,6 +1216,8 @@ function renderizarGestion(datos, paginacion) {
     renderizarTabla: renderizarTabla,
     renderizarMisRequerimientos: renderizarMisRequerimientos,
     renderizarGestion: renderizarGestion,
+    mostrarSugerenciasGestion: mostrarSugerenciasGestion,
+    ocultarSugerenciasGestion: ocultarSugerenciasGestion,
     renderizarFiltros: renderizarFiltros,
     renderizarFiltrosMisRequerimientos: renderizarFiltrosMisRequerimientos,
     renderizarActividad: renderizarActividad,

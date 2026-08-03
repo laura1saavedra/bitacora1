@@ -2866,37 +2866,123 @@ async function buscarUsuarios() {
     renderizarPaginaGestion();
   }
 
+  async function resolverPersonaCampoGestion(campo) {
+    const valorActual = campo.value.trim();
+    const original = campo.dataset.original || "";
+    if (valorActual === original) {
+      return undefined;
+    }
+    if (!valorActual) {
+      return null;
+    }
+    if (
+      campo.dataset.idSugerido &&
+      campo.dataset.nombreSugerido &&
+      valorActual === campo.dataset.nombreSugerido
+    ) {
+      return Number(campo.dataset.idSugerido);
+    }
+    const persona = await Modelo.resolverUsuarioPorCorreo(valorActual);
+    return persona.id;
+  }
+
+  function bloquearCamposGestion(fila) {
+    ["gestion-responsable", "gestion-mentor", "gestion-comentarios"].forEach(
+      function (clase) {
+        const campo = fila.querySelector("." + clase);
+        if (!campo) {
+          return;
+        }
+        campo.value = campo.dataset.original || "";
+        campo.readOnly = true;
+        delete campo.dataset.idSugerido;
+        delete campo.dataset.nombreSugerido;
+        Vista.ocultarSugerenciasGestion(campo);
+      }
+    );
+    const contador = fila.querySelector(".gestion-contador-caracteres");
+    const comentarios = fila.querySelector(".gestion-comentarios");
+    if (contador && comentarios) {
+      contador.textContent = comentarios.value.length + "/500";
+    }
+    const botonEditar = fila.querySelector(".edit-btn-gestion");
+    const botonConfirmar = fila.querySelector(".confirm-btn-gestion");
+    const botonCancelar = fila.querySelector(".cancel-btn-gestion");
+    if (botonEditar) {
+      botonEditar.hidden = false;
+    }
+    if (botonConfirmar) {
+      botonConfirmar.hidden = true;
+    }
+    if (botonCancelar) {
+      botonCancelar.hidden = true;
+    }
+  }
+
+  function activarEdicionGestion(fila) {
+    ["gestion-responsable", "gestion-mentor", "gestion-comentarios"].forEach(
+      function (clase) {
+        const campo = fila.querySelector("." + clase);
+        if (campo) {
+          campo.readOnly = false;
+        }
+      }
+    );
+    const botonEditar = fila.querySelector(".edit-btn-gestion");
+    const botonConfirmar = fila.querySelector(".confirm-btn-gestion");
+    const botonCancelar = fila.querySelector(".cancel-btn-gestion");
+    if (botonEditar) {
+      botonEditar.hidden = true;
+    }
+    if (botonConfirmar) {
+      botonConfirmar.hidden = false;
+    }
+    if (botonCancelar) {
+      botonCancelar.hidden = false;
+    }
+    const campoResponsable = fila.querySelector(".gestion-responsable");
+    if (campoResponsable) {
+      campoResponsable.focus();
+    }
+  }
+
+  let temporizadorSugerenciasGestion = null;
+
+  async function buscarSugerenciasGestion(campo) {
+    const texto = campo.value.trim();
+    if (texto.length < 2) {
+      Vista.ocultarSugerenciasGestion(campo);
+      return;
+    }
+    try {
+      const personas = await Modelo.buscarUsuariosSitio(texto);
+      if (document.activeElement !== campo) {
+        return;
+      }
+      Vista.mostrarSugerenciasGestion(campo, personas);
+    } catch (error) {
+      Vista.ocultarSugerenciasGestion(campo);
+    }
+  }
+
+  
   async function guardarGestion(id, fila) {
-    const estado = fila.querySelector(".gestion-estado").value;
     const comentarios = fila.querySelector(".gestion-comentarios").value.trim();
     const campoResponsable = fila.querySelector(".gestion-responsable");
     const campoMentor = fila.querySelector(".gestion-mentor");
-    const valorResponsable = campoResponsable.value.trim();
-    const valorMentor = campoMentor.value.trim();
-    const originalResponsable = campoResponsable.dataset.original || "";
-    const originalMentor = campoMentor.dataset.original || "";
 
     const cambios = {
-      estado: estado,
       comentarios: comentarios
     };
 
     try {
-      if (valorResponsable !== originalResponsable) {
-        if (!valorResponsable) {
-          cambios.responsable = null;
-        } else {
-          const persona = await Modelo.resolverUsuarioPorCorreo(valorResponsable);
-          cambios.responsable = persona.id;
-        }
+      const idResponsable = await resolverPersonaCampoGestion(campoResponsable);
+      if (idResponsable !== undefined) {
+        cambios.responsable = idResponsable;
       }
-      if (valorMentor !== originalMentor) {
-        if (!valorMentor) {
-          cambios.mentor = null;
-        } else {
-          const persona = await Modelo.resolverUsuarioPorCorreo(valorMentor);
-          cambios.mentor = persona.id;
-        }
+      const idMentor = await resolverPersonaCampoGestion(campoMentor);
+      if (idMentor !== undefined) {
+        cambios.mentor = idMentor;
       }
     } catch (error) {
       await mostrarAlerta({
@@ -3136,9 +3222,32 @@ if(btnLimpiarIndicadores){
 document
       .getElementById("tabla-gestion")
       .addEventListener("click", function (evento) {
-        const botonGuardar = evento.target.closest(".save-btn");
-        if (botonGuardar) {
-          guardarGestion(botonGuardar.dataset.id, botonGuardar.closest("tr"));
+        const sugerencia = evento.target.closest(".gestion-sugerencia-item");
+        if (sugerencia) {
+          const contenedor = sugerencia.closest(".gestion-campo-autocompletar");
+          const campo = contenedor ? contenedor.querySelector("input") : null;
+          if (campo) {
+            campo.value = sugerencia.dataset.nombre;
+            campo.dataset.idSugerido = sugerencia.dataset.id;
+            campo.dataset.nombreSugerido = sugerencia.dataset.nombre;
+            Vista.ocultarSugerenciasGestion(campo);
+            campo.focus();
+          }
+          return;
+        }
+        const botonConfirmar = evento.target.closest(".confirm-btn-gestion");
+        if (botonConfirmar) {
+          guardarGestion(botonConfirmar.dataset.id, botonConfirmar.closest("tr"));
+          return;
+        }
+        const botonEditar = evento.target.closest(".edit-btn-gestion");
+        if (botonEditar) {
+          activarEdicionGestion(botonEditar.closest("tr"));
+          return;
+        }
+        const botonCancelar = evento.target.closest(".cancel-btn-gestion");
+        if (botonCancelar) {
+          bloquearCamposGestion(botonCancelar.closest("tr"));
           return;
         }
         const botonVer = evento.target.closest(".view-btn");
@@ -3146,6 +3255,51 @@ document
           verRequerimiento(botonVer.dataset.id);
         }
       });
+    document
+      .getElementById("tabla-gestion")
+      .addEventListener("input", function (evento) {
+        const campo = evento.target;
+        if (campo.classList && campo.classList.contains("gestion-comentarios")) {
+          const fila = campo.closest("tr");
+          const contador = fila
+            ? fila.querySelector(".gestion-contador-caracteres")
+            : null;
+          if (contador) {
+            contador.textContent = campo.value.length + "/500";
+          }
+          return;
+        }
+        if (
+          campo.classList &&
+          (campo.classList.contains("gestion-responsable") ||
+            campo.classList.contains("gestion-mentor"))
+        ) {
+          delete campo.dataset.idSugerido;
+          delete campo.dataset.nombreSugerido;
+          global.clearTimeout(temporizadorSugerenciasGestion);
+          temporizadorSugerenciasGestion = global.setTimeout(function () {
+            buscarSugerenciasGestion(campo);
+          }, 300);
+        }
+      });
+    document
+      .getElementById("tabla-gestion")
+      .addEventListener(
+        "focusout",
+        function (evento) {
+          const campo = evento.target;
+          if (
+            campo.classList &&
+            (campo.classList.contains("gestion-responsable") ||
+              campo.classList.contains("gestion-mentor"))
+          ) {
+            global.setTimeout(function () {
+              Vista.ocultarSugerenciasGestion(campo);
+            }, 150);
+          }
+        },
+        true
+      );
 
     document
       .getElementById("buscador-gestion")

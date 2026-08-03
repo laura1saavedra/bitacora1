@@ -800,7 +800,6 @@ opacity:.9;
 
 #bitacora-app .gestion-responsable,
 #bitacora-app .gestion-mentor,
-#bitacora-app .gestion-estado,
 #bitacora-app .gestion-comentarios {
   width: 100%;
   min-width: 96px;
@@ -811,6 +810,67 @@ opacity:.9;
   background-color: #fff;
   color: #44536c;
   font-size: 12px;
+}
+
+#bitacora-app .gestion-responsable[readonly],
+#bitacora-app .gestion-mentor[readonly],
+#bitacora-app .gestion-comentarios[readonly] {
+  background-color: #f3f5f9;
+  color: #6b7690;
+  cursor: not-allowed;
+}
+
+.gestion-campo-autocompletar {
+  position: relative;
+}
+
+.gestion-sugerencias {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  width: max-content;
+  min-width: 100%;
+  max-width: 260px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(16, 33, 63, 0.14);
+}
+
+.gestion-sugerencia-item {
+  display: block;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #2d3a50;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gestion-sugerencia-item:hover,
+.gestion-sugerencia-item:focus-visible {
+  background: #eef3fb;
+}
+
+.gestion-sugerencia-correo {
+  display: block;
+  color: #8592a8;
+  font-size: 10.5px;
+}
+
+.gestion-contador-caracteres {
+  display: block;
+  margin-top: 3px;
+  color: #97a2b5;
+  font-size: 10px;
+  text-align: right;
 }
 #view-gestion .table-scroll table th:nth-child(1),
 #view-gestion .table-scroll table td:nth-child(1),
@@ -2154,7 +2214,8 @@ opacity:.9;
     content: none;
   }
 
-  #bitacora-app .gestion-estado,
+  #bitacora-app .gestion-responsable,
+  #bitacora-app .gestion-mentor,
   #bitacora-app .gestion-comentarios {
     width: 100%;
     min-width: 0;

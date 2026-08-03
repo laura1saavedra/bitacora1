@@ -118,6 +118,7 @@
   };
 
   let tipoEntidadLista = null;
+  let cacheUsuariosSitio = null;
   let tipoEntidadHistorial = null;
   let esquemaLista = null;
   let catalogosPorNombre = {};
@@ -908,13 +909,73 @@
     }
     const datos = await respuesta.json();
     const usuario = datos.d || datos;
-    return {
+ return {
       id: usuario.Id,
       nombre: usuario.Title,
       correo: usuario.Email || correoNormalizado
     };
   }
-  async function obtenerTipoEntidad() {
+
+  async function buscarUsuariosSitio(texto) {
+    // Busca solo entre personas que ya han interactuado con este sitio de
+    // SharePoint (lista siteusers). Si alguien nunca ha entrado al sitio no
+    // aparecera aqui todavia; para esa primera vez sigue haciendo falta
+    // escribir el correo completo (ver resolverUsuarioPorCorreo).
+    const consulta = String(texto || "").trim();
+    if (consulta.length < 2) {
+      return [];
+    }
+    if (!cacheUsuariosSitio) {
+      const respuesta = await solicitar(
+        urlSitio() +
+          "/_api/web/siteusers?$filter=" +
+          encodeURIComponent("PrincipalType eq 1") +
+          "&$top=5000",
+        {
+          method: "GET",
+          credentials: "same-origin",
+          headers: ODATA
+        }
+      );
+      if (!respuesta.ok) {
+        return [];
+      }
+    const datos = await respuesta.json();
+    const resultados = (datos.d && datos.d.results) || [];
+    const consultaNormalizada = consulta.toLowerCase();
+    return resultados
+      .map(function (usuario) {
+        return {
+          id: usuario.Id,
+          nombre: usuario.Title,
+          correo: usuario.Email || usuario.LoginName || ""
+        };
+      })
+      .filter(function (persona) {
+        // SharePoint no siempre respeta el $filter de substringof sobre
+        // Title en /_api/web/siteusers, asi que se refuerza el filtro
+        // aqui para no mostrar nombres que no coincidan con lo escrito.
+        return (
+          (persona.nombre &&
+            persona.nombre.toLowerCase().indexOf(consultaNormalizada) !== -1) ||
+          (persona.correo &&
+            persona.correo.toLowerCase().indexOf(consultaNormalizada) !== -1)
+        );
+      });
+  }
+    const consultaNormalizada = consulta.toLowerCase();
+    return cacheUsuariosSitio
+      .filter(function (persona) {
+        return (
+          (persona.nombre &&
+            persona.nombre.toLowerCase().indexOf(consultaNormalizada) !== -1) ||
+          (persona.correo &&
+            persona.correo.toLowerCase().indexOf(consultaNormalizada) !== -1)
+        );
+      })
+      .slice(0, 8);
+  }
+    async function obtenerTipoEntidad() {
     if (tipoEntidadLista) {
       return tipoEntidadLista;
     }
@@ -1994,6 +2055,7 @@ async function obtenerDatosIndicadores() {
     actualizar: actualizar,
     reciclarArchivo: reciclarArchivo,
     resolverUsuarioPorCorreo: resolverUsuarioPorCorreo,
+    buscarUsuariosSitio: buscarUsuariosSitio,
     eliminar: eliminar,
     obtenerBitacora: obtenerBitacora,
     agregarActividad: agregarActividad,
