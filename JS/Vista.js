@@ -1,12 +1,12 @@
 // ============================================================
 // VISTA.JS
-// Navegación, renderizado y lectura de la interfaz.
+// Navegacion, renderizado y lectura de la interfaz.
 // No consulta SharePoint directamente: comunica las acciones al Controlador.
 // ============================================================
 (function (global) {
   "use strict";
 
-  // Relación estable entre las rutas lógicas y sus contenedores del DOM.
+  // Relacion estable entre las rutas logicas y sus contenedores del DOM.
   const VISTAS = {
     dashboard: "view-dashboard",
     crear: "view-crear-requerimiento",
@@ -15,7 +15,7 @@
     historial: "view-historial",
      indicadores: "view-indicadores"
   };
-  // SVG en línea para evitar dependencias externas y heredar el color del tema.
+  // SVG en linea para evitar dependencias externas y heredar el color del tema.
   const ICONO_OJO =
     '<svg viewBox="0 0 24 24" aria-hidden="true">' +
     '<path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>' +
@@ -56,7 +56,7 @@
       "en proceso": "orange",
       "pruebas": "teal",
       "en pruebas": "teal",
-      "esperando documentación usuario": "indigo",
+      "esperando documentaci\u00f3n usuario": "indigo",
       "esperando documentacion usuario": "indigo",
       "esperando cierre usuario": "purple",
       "finalizados": "green",
@@ -67,7 +67,7 @@
     return mapa[clave] || "neutral";
   }
 
-  // Todo valor dinámico insertado mediante innerHTML debe pasar por esta función.
+  // Todo valor dinamico insertado mediante innerHTML debe pasar por esta funcion.
   function textoSeguro(valor) {
     return String(valor == null ? "" : valor)
       .replace(/&/g, "&amp;")
@@ -105,7 +105,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // Navegación entre vistas principales
+  // Navegacion entre vistas principales
   // --------------------------------------------------------------------------
   function mostrarVista(nombre) {
     Object.keys(VISTAS).forEach(function (clave) {
@@ -205,7 +205,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // Tableros, tablas y paginación
+  // Tableros, tablas y paginacion
   // --------------------------------------------------------------------------
   function estadoCoincide(valorEstado, variantes) {
     // Compara ignorando mayusculas/minusculas y espacios de sobra, para no
@@ -228,7 +228,8 @@
       }).length,
       "total-pruebas": datos.filter(function (item) {
         return estadoCoincide(item.estado, [
-          "Esperando documentación usuario",
+          "Esperando documentaci\u00f3n usuario",
+          // Variante heredada sin tilde que puede existir en SharePoint.
           "Esperando Documentacion Usuario"
         ]);
       }).length,
@@ -455,9 +456,38 @@ function renderizarTabla(datos, paginacion) {
       : '<tr class="empty-row"><td colspan="9">' +
         (paginacion && paginacion.filtrosActivos
           ? "No hay requerimientos que coincidan con los filtros."
-          : "No tienes requerimientos registrados.") +
+          : cuerpo.dataset.mensajeVacio || "No tienes requerimientos registrados.") +
         "</td></tr>";
     renderizarPaginacionMisRequerimientos(paginacion);
+  }
+
+  function activarPestanaMisRequerimientos(tipo) {
+    const textos = {
+      responsable: "Requerimientos asignados al usuario autenticado como responsable.",
+      mentor: "Requerimientos asignados al usuario autenticado como mentor.",
+      creados: "Requerimientos creados por el usuario autenticado."
+    };
+    const vacios = {
+      responsable: "No tienes requerimientos asignados como responsable.",
+      mentor: "No tienes requerimientos asignados como mentor.",
+      creados: "No tienes requerimientos creados."
+    };
+    const panel = document.getElementById("panel-mis-requerimientos");
+    document.querySelectorAll(".my-requests-tab").forEach(function (pestana) {
+      const activa = pestana.dataset.tipoMis === tipo;
+      pestana.classList.toggle("active", activa);
+      pestana.setAttribute("aria-selected", activa ? "true" : "false");
+      pestana.tabIndex = activa ? 0 : -1;
+      if (activa && panel) {
+        panel.setAttribute("aria-labelledby", pestana.id);
+      }
+    });
+    document.getElementById("descripcion-mis-requerimientos").textContent =
+      textos[tipo] || textos.responsable;
+    const cuerpo = document.getElementById("tabla-mis-requerimientos");
+    if (cuerpo) {
+      cuerpo.dataset.mensajeVacio = vacios[tipo] || vacios.responsable;
+    }
   }
 
 function renderizarGestion(datos, paginacion) {
@@ -522,7 +552,7 @@ function renderizarGestion(datos, paginacion) {
               '" title="Guardar" hidden>' + ICONO_CHECK + "</button>" +
               '<button class="action-btn icon-action cancel-btn-gestion" data-id="' +
               textoSeguro(req.id) +
-              '" type="button" aria-label="Cancelar edición de ' +
+              '" type="button" aria-label="Cancelar edici\u00f3n de ' +
               textoSeguro(req.id) +
               '" title="Cancelar" hidden>' + ICONO_X + "</button>" +
               "</div></td></tr>"
@@ -1215,6 +1245,7 @@ function renderizarGestion(datos, paginacion) {
     renderizarTarjetas: renderizarTarjetas,
     renderizarTabla: renderizarTabla,
     renderizarMisRequerimientos: renderizarMisRequerimientos,
+    activarPestanaMisRequerimientos: activarPestanaMisRequerimientos,
     renderizarGestion: renderizarGestion,
     mostrarSugerenciasGestion: mostrarSugerenciasGestion,
     ocultarSugerenciasGestion: ocultarSugerenciasGestion,

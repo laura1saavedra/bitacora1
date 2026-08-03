@@ -6,14 +6,14 @@
   <meta name="description" content="Bit&#225;cora de requerimientos de Apps Colombia integrada con SharePoint Online.">
   <title>Bit&#225;cora | Backlog </title>
   <link rel="stylesheet"
-    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260731.40" />
+    href="../SiteAssets/Retiro%20de%20cesantias/CSS/main.css?v=20260803.42" />
 </head>
 <body>
   <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
 
-  <!-- Contenedor raíz: aísla la aplicación de los estilos de SharePoint. -->
+  <!-- Contenedor raiz: aisla la aplicacion de los estilos de SharePoint. -->
   <div id="bitacora-app" class="app">
-    <!-- Navegación lateral compartida por todas las vistas. -->
+    <!-- Navegacion lateral compartida por todas las vistas. -->
     <aside class="sidebar" aria-label="Navegaci&#243;n principal">
       <div class="brand">
           <div class="brand-mark">
@@ -85,7 +85,7 @@
         Datos administrados desde SharePoint Online
       </div>
 
-      <!-- Vista principal: indicadores rápidos y backlog paginado. -->
+      <!-- Vista principal: indicadores rapidos y backlog paginado. -->
       <section id="view-dashboard" aria-labelledby="titulo-dashboard">
         <header class="top-row">
           <div>
@@ -212,7 +212,7 @@
         </section>
 
       </section>
-      <!-- Vista administrativa de indicadores y gráficas. -->
+      <!-- Vista administrativa de indicadores y graficas. -->
        <section id="view-indicadores" hidden>
 
               <header class="top-row">
@@ -226,7 +226,7 @@
               Indicadores de flujo de trabajo
               </h1>
               <p class="subtitle">
-              Analisis del estado de requerimientos y carga administrativa.
+              An&#225;lisis del estado de requerimientos y carga administrativa.
               </p>
               </div>
 <div class="filtro-indicadores">
@@ -301,7 +301,7 @@ Estado de requerimientos
 </h2>
 
 <p>
-Distribucion actual del backlog.
+Distribuci&#243;n actual del backlog.
 </p>
 
 </div>
@@ -549,17 +549,36 @@ Resumen operativo
         </div>
       </section>
 
-      <!-- Vista filtrada con los requerimientos del usuario en sesión. -->
+      <!-- Vista filtrada con los requerimientos del usuario en sesion. -->
       <section id="view-mis-requerimientos" aria-labelledby="titulo-mis-requerimientos" hidden>
         <header class="top-row">
           <div>
             <p class="eyebrow">SEGUIMIENTO PERSONAL</p>
             <h1 id="titulo-mis-requerimientos">Mis requerimientos</h1>
-            <p class="subtitle">Solicitudes creadas por el usuario autenticado.</p>
+            <p class="subtitle" id="descripcion-mis-requerimientos">Requerimientos asignados al usuario autenticado como responsable.</p>
           </div>
           <button class="btn-primary" type="button" data-vista="crear">Crear requerimiento</button>
         </header>
         <section class="panel">
+          <div class="my-requests-tabs" role="tablist" aria-label="Categor&#237;as de mis requerimientos"
+            aria-orientation="vertical">
+            <button class="my-requests-tab active" id="tab-mis-responsable" type="button" role="tab"
+              aria-selected="true" aria-controls="panel-mis-requerimientos" data-tipo-mis="responsable">
+              <span class="my-requests-tab-arrow" aria-hidden="true"></span>
+              <span>Requerimientos en los que soy responsable</span>
+            </button>
+            <button class="my-requests-tab" id="tab-mis-mentor" type="button" role="tab"
+              aria-selected="false" aria-controls="panel-mis-requerimientos" data-tipo-mis="mentor" tabindex="-1">
+              <span class="my-requests-tab-arrow" aria-hidden="true"></span>
+              <span>Requerimientos en los que soy mentor</span>
+            </button>
+            <button class="my-requests-tab" id="tab-mis-creados" type="button" role="tab"
+              aria-selected="false" aria-controls="panel-mis-requerimientos" data-tipo-mis="creados" tabindex="-1">
+              <span class="my-requests-tab-arrow" aria-hidden="true"></span>
+              <span>Requerimientos creados por m&#237;</span>
+            </button>
+          </div>
+          <div id="panel-mis-requerimientos" role="tabpanel" aria-labelledby="tab-mis-responsable">
           <div class="filters" aria-label="Filtros de mis requerimientos">
             <label class="search" for="buscador-mis-requerimientos">
               <span aria-hidden="true">&#x2315;</span>
@@ -606,6 +625,7 @@ Resumen operativo
             <nav class="pagination" id="controles-paginacion-mis"
               aria-label="Paginaci&#243;n de mis requerimientos"></nav>
           </footer>
+          </div>
         </section>
 
         <section class="panel" aria-labelledby="titulo-ciclo-atencion">
@@ -626,7 +646,7 @@ Resumen operativo
         </section>
       </section>
 
-      <!-- Auditoría de acciones registrada en la lista de historial. -->
+      <!-- Auditoria de acciones registrada en la lista de historial. -->
       <section id="view-historial" aria-labelledby="titulo-historial" hidden>
         <header class="top-row">
           <div>
@@ -697,7 +717,7 @@ Resumen operativo
         </section>
       </section>
 
-      <!-- Gestión global disponible solamente para administradores. -->
+      <!-- Gestion global disponible solamente para administradores. -->
       <section id="view-gestion" class="admin-only" aria-labelledby="titulo-gestion" hidden>
         <header class="top-row">
           <div>
@@ -786,9 +806,9 @@ Resumen operativo
   </div>
 
   <!-- Orden MVC: el Controlador se carga al final porque depende de Modelo y Vista. -->
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260731.48"></script>
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260731.38"></script>
-  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260731.48"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Modelo.js?v=20260803.51"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Vista.js?v=20260803.40"></script>
+  <script src="../SiteAssets/Retiro%20de%20cesantias/JS/Controlador.js?v=20260803.52"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>

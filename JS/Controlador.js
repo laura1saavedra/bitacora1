@@ -1,24 +1,26 @@
 // ============================================================
 // CONTROLADOR.JS
-// Coordina el Modelo con la Vista y gestiona los eventos de la aplicación.
-// Conserva aquí el estado de sesión; Modelo y Vista permanecen desacoplados.
+// Coordina el Modelo con la Vista y gestiona los eventos de la aplicacion.
+// Conserva aqui el estado de sesion; Modelo y Vista permanecen desacoplados.
 // ============================================================
 (function (global) {
   "use strict";
 
-  // Estado general de navegación, permisos y datos cargados.
+  // Estado general de navegacion, permisos y datos cargados.
   let requerimientos = [];
   let eventosRegistrados = false;
   let inicializacionIniciada = false;
   let observadorChromeSharePoint = null;
   let documentoObservadoSharePoint = null;
-  // Estado temporal de formularios, edición y selección de usuarios.
+  // Estado temporal de formularios, edicion y seleccion de usuarios.
   let requerimientoEnEdicion = null;
   let archivosEliminadosEdicion = [];
   let origenEdicion = "mis";
   // Usuarios seleccionados para el campo Solicitado por
   let usuariosSeleccionados = [];
   let requerimientosPropios = [];
+  let todosMisRequerimientos = [];
+  let tipoMisRequerimientos = "responsable";
   let indicadoresEstados = [];
   let indicadoresResponsables = [];
   let graficaEstados = null;
@@ -31,7 +33,7 @@
   let paginaHistorial = 1;
   let dialogoMensajeActual = null;
   let focoAntesDelDialogo = null;
-  // Reglas de paginación y carga documental de la interfaz.
+  // Reglas de paginacion y carga documental de la interfaz.
   const REQUERIMIENTOS_POR_PAGINA = 5;
   const ACTIVIDADES_POR_PAGINA = 8;
   const TIPOS_DOCUMENTO_PREDETERMINADOS = [
@@ -53,8 +55,8 @@
     estados: []
   };
 
-  // Elementos del contenedor clásico de SharePoint que se ajustan únicamente
-  // en modo de visualización; el modo de edición conserva sus herramientas.
+  // Elementos del contenedor clasico de SharePoint que se ajustan unicamente
+  // en modo de visualizacion; el modo de edicion conserva sus herramientas.
   const SELECTORES_CHROME_SHAREPOINT = [
     "#suiteBar",
     "#suiteBarTop",
@@ -79,7 +81,7 @@
   ];
 
   // --------------------------------------------------------------------------
-  // Integración visual con la página contenedora de SharePoint
+  // Integracion visual con la pagina contenedora de SharePoint
   // --------------------------------------------------------------------------
   function obtenerDocumentoSharePoint() {
     try {
@@ -271,7 +273,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // Inicio de la aplicación y carga inicial
+  // Inicio de la aplicacion y carga inicial
   // --------------------------------------------------------------------------
   async function iniciar() {
     if (inicializacionIniciada) {
@@ -312,7 +314,7 @@
       poblarSelectorCatalogo(
         "app",
         catalogos.apps,
-        "Seleccione una aplicación"
+        "Seleccione una aplicaci\u00f3n"
       );
       poblarSelectorCatalogo(
         "prioridad",
@@ -341,7 +343,7 @@
         origen: "SharePoint",
         error: error.message
       };
-      console.error("Carga de catálogos de SharePoint:", error);
+      console.error("Carga de cat\u00e1logos de SharePoint:", error);
     }
   }
 
@@ -506,7 +508,7 @@ if(fechaInicio && fechaFin){
 
     if(isNaN(fecha)){
         console.log(
-            "Fecha inválida:",
+            "Fecha inv\u00e1lida:",
             fechaTexto
         );
 
@@ -565,7 +567,7 @@ datos.forEach(function(req){
 });
 
 
-// Crear estructura fija para la gráfica
+// Crear estructura fija para la grafica
 
 indicadoresEstados = estadosFlujo.map(function(estado){
 
@@ -718,7 +720,7 @@ function renderizarGraficasIndicadores(){
     const canvasResponsables =
         document.getElementById("graficoResponsables");
 
-// destruir gráficas anteriores antes de crear nuevas
+// Destruir graficas anteriores antes de crear nuevas.
 
 if(graficaEstados){
 
@@ -810,7 +812,7 @@ if(graficaResponsables){
 
 
     // ===============================
-    // GRAFICA RESPONSABLES
+    // GRAFICA DE RESPONSABLES
     // ===============================
 
     graficaResponsables = new Chart(canvasResponsables, {
@@ -1315,6 +1317,103 @@ if(graficaResponsables){
       .some(function (valor) {
         return solicitantes.indexOf(String(valor).trim().toLowerCase()) !== -1;
       });
+  }
+
+  function coincideConUsuarioActual(nombre, correo) {
+    const usuario = Modelo.usuarioActual();
+    const identidadesUsuario = [usuario.nombre, usuario.correo]
+      .filter(Boolean)
+      .map(normalizarIdentidadUsuario);
+    const identidadesCampo = [nombre, correo]
+      .filter(Boolean)
+      .map(normalizarIdentidadUsuario);
+
+    return identidadesUsuario.some(function (identidad) {
+      return identidadesCampo.indexOf(identidad) !== -1;
+    });
+  }
+
+  function normalizarIdentidadUsuario(valor) {
+    const identidad = String(valor || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\u00e1\u00e0\u00e4\u00e2]/g, "a")
+      .replace(/[\u00e9\u00e8\u00eb\u00ea]/g, "e")
+      .replace(/[\u00ed\u00ec\u00ef\u00ee]/g, "i")
+      .replace(/[\u00f3\u00f2\u00f6\u00f4]/g, "o")
+      .replace(/[\u00fa\u00f9\u00fc\u00fb]/g, "u")
+      .replace(/\u00f1/g, "n");
+    const partesInicioSesion = identidad.split("|");
+    return partesInicioSesion[partesInicioSesion.length - 1].trim();
+  }
+
+  function obtenerMisRequerimientosPorTipo(tipo) {
+    return todosMisRequerimientos.filter(function (req) {
+      if (tipo === "mentor") {
+        return coincideConUsuarioActual(req.mentor, req.mentorCorreo);
+      }
+      if (tipo === "creados") {
+        return coincideConUsuarioActual(req.creadoPor, req.creadoPorCorreo) ||
+          (!req.creadoPor && !req.creadoPorCorreo && esRequerimientoPropio(req));
+      }
+      return coincideConUsuarioActual(req.responsable, req.responsableCorreo);
+    });
+  }
+
+  function cambiarTipoMisRequerimientos(tipo) {
+    if (["responsable", "mentor", "creados"].indexOf(tipo) === -1) {
+      return;
+    }
+    tipoMisRequerimientos = tipo;
+    requerimientosPropios = obtenerMisRequerimientosPorTipo(tipo);
+    Vista.activarPestanaMisRequerimientos(tipo);
+    Vista.renderizarFiltrosMisRequerimientos(requerimientosPropios);
+    paginaMisRequerimientos = 1;
+    renderizarPaginaMisRequerimientos();
+  }
+
+  function sincronizarMisRequerimientos(datos, debeRenderizar) {
+    todosMisRequerimientos = Array.isArray(datos) ? datos.slice() : [];
+    requerimientosPropios = obtenerMisRequerimientosPorTipo(
+      tipoMisRequerimientos
+    );
+    if (!debeRenderizar) {
+      return;
+    }
+    Vista.activarPestanaMisRequerimientos(tipoMisRequerimientos);
+    Vista.renderizarFiltrosMisRequerimientos(requerimientosPropios);
+    paginaMisRequerimientos = 1;
+    renderizarPaginaMisRequerimientos();
+  }
+
+  function establecerDatosGestion(datos) {
+    const todos = Array.isArray(datos) ? datos : [];
+    // Los requerimientos gestionados siguen disponibles en Backlog y en
+    // Mis requerimientos, aunque dejen de aparecer en esta bandeja.
+    requerimientosGestion = todos.filter(function (req) {
+      const tieneResponsable = Boolean(String(req.responsable || "").trim());
+      const tieneObservacion = Boolean(String(req.comentarios || "").trim());
+      return !(tieneResponsable && tieneObservacion);
+    });
+    paginaGestion = 1;
+    renderizarPaginaGestion();
+  }
+
+  function integrarRequerimientoGestion(actualizado) {
+    const datosCompartidos = todosMisRequerimientos.slice();
+    const indice = datosCompartidos.findIndex(function (req) {
+      return (
+        (actualizado.spItemId && req.spItemId === actualizado.spItemId) ||
+        String(req.id) === String(actualizado.id)
+      );
+    });
+    if (indice === -1) {
+      datosCompartidos.push(actualizado);
+    } else {
+      datosCompartidos[indice] = actualizado;
+    }
+    sincronizarMisRequerimientos(datosCompartidos, false);
+    establecerDatosGestion(datosCompartidos);
   }
 
   async function editarRequerimiento(id, origen) {
@@ -2527,19 +2626,10 @@ async function buscarUsuarios() {
 
   async function cargarMisRequerimientos() {
     try {
-      const datos = await Modelo.obtenerTodos();
-      requerimientosPropios = datos.filter(function (req) {
-        return esRequerimientoPropio(req);
-      });
-      Vista.renderizarFiltrosMisRequerimientos(requerimientosPropios);
-      paginaMisRequerimientos = 1;
-      renderizarPaginaMisRequerimientos();
+      sincronizarMisRequerimientos(await Modelo.obtenerTodos(), true);
     } catch (error) {
       console.error("Carga de requerimientos personales:", error);
-      requerimientosPropios = [];
-      Vista.renderizarFiltrosMisRequerimientos([]);
-      paginaMisRequerimientos = 1;
-      renderizarPaginaMisRequerimientos();
+      sincronizarMisRequerimientos([], true);
     }
   }
 
@@ -2771,31 +2861,13 @@ async function buscarUsuarios() {
 
   async function cargarGestion() {
     try {
-      Vista.renderizarGestion(await Modelo.obtenerTodos());
-    } catch (error) {
-      console.error("Carga de gesti\u00f3n:", error);
-      Vista.renderizarGestion([]);
-    }
-  }
-
-  async function cargarGestion() {
-    try {
       const todos = await Modelo.obtenerTodos();
-      // Un requerimiento con Responsable Y Observaciones ya diligenciados
-      // se considera gestionado y deja de listarse aqui (sigue existiendo
-      // y visible normalmente en Backlog / Mis requerimientos).
-      requerimientosGestion = todos.filter(function (req) {
-        const tieneResponsable = Boolean(String(req.responsable || "").trim());
-        const tieneObservacion = Boolean(String(req.comentarios || "").trim());
-        return !(tieneResponsable && tieneObservacion);
-      });
-      paginaGestion = 1;
-      renderizarPaginaGestion();
+      sincronizarMisRequerimientos(todos, false);
+      establecerDatosGestion(todos);
     } catch (error) {
       console.error("Carga de gesti\u00f3n:", error);
-      requerimientosGestion = [];
-      paginaGestion = 1;
-      renderizarPaginaGestion();
+      sincronizarMisRequerimientos([], false);
+      establecerDatosGestion([]);
     }
   }
 
@@ -2994,7 +3066,8 @@ async function buscarUsuarios() {
     }
 
     try {
-      await Modelo.actualizar(id, cambios);
+      const actualizado = await Modelo.actualizar(id, cambios);
+      integrarRequerimientoGestion(actualizado);
       await registrarActividadCompartida(
         "Actualiz\u00f3 el requerimiento " + id,
         {
@@ -3007,7 +3080,6 @@ async function buscarUsuarios() {
         title: "Requerimiento actualizado",
         text: "Los cambios fueron guardados correctamente."
       });
-      await cargarGestion();
     } catch (error) {
       await mostrarAlerta({
         icon: "error",
@@ -3074,6 +3146,39 @@ if(btnLimpiarIndicadores){
     document
       .getElementById("buscador-mis-requerimientos")
       .addEventListener("input", buscarMisRequerimientos);
+    document
+      .querySelector(".my-requests-tabs")
+      .addEventListener("click", function (evento) {
+        const pestana = evento.target.closest("button[data-tipo-mis]");
+        if (pestana) {
+          cambiarTipoMisRequerimientos(pestana.dataset.tipoMis);
+        }
+      });
+    document
+      .querySelector(".my-requests-tabs")
+      .addEventListener("keydown", function (evento) {
+        if (["ArrowUp", "ArrowDown", "Home", "End"].indexOf(evento.key) === -1) {
+          return;
+        }
+        const pestanas = Array.prototype.slice.call(
+          document.querySelectorAll(".my-requests-tab")
+        );
+        const actual = pestanas.indexOf(document.activeElement);
+        if (actual === -1) {
+          return;
+        }
+        evento.preventDefault();
+        let destino = actual;
+        if (evento.key === "Home") {
+          destino = 0;
+        } else if (evento.key === "End") {
+          destino = pestanas.length - 1;
+        } else {
+          destino = (actual + (evento.key === "ArrowDown" ? 1 : -1) + pestanas.length) % pestanas.length;
+        }
+        pestanas[destino].focus();
+        cambiarTipoMisRequerimientos(pestanas[destino].dataset.tipoMis);
+      });
     ["filtro-app-mis", "filtro-estado-mis", "filtro-fecha-mis"]
       .forEach(function (id) {
         document
@@ -3486,7 +3591,7 @@ if (resultadosUsuarios) {
             renderizarUsuariosSeleccionados();
 
 
-            // Limpia busqueda
+            // Limpia la busqueda
             inputBuscarUsuario.value = "";
 
 

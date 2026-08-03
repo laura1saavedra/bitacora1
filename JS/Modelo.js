@@ -1,12 +1,12 @@
 // ============================================================
 // MODELO.JS
-// Datos, configuración y acceso REST a SharePoint.
-// Esta capa centraliza la traducción entre el dominio de la aplicación y OData.
+// Datos, configuracion y acceso REST a SharePoint.
+// Esta capa centraliza la traduccion entre el dominio de la aplicacion y OData.
 // ============================================================
 (function (global) {
   "use strict";
 
-  // Valores de infraestructura y límites compartidos por todas las operaciones.
+  // Valores de infraestructura y limites compartidos por todas las operaciones.
   const CONFIG = Object.freeze({
     lista: "Backlog",
     listaApps: "CatalogoAPP",
@@ -26,7 +26,7 @@
   });
 
   // Mapea cada propiedad del dominio con su columna real en SharePoint. Los
-  // títulos alternativos permiten tolerar diferencias entre ambientes.
+  // Titulos alternativos permiten tolerar diferencias entre ambientes.
   const CAMPOS = Object.freeze({
     id: {
       interno: "Title",
@@ -38,7 +38,7 @@
       tipo: "busqueda",
       listaCatalogo: "CatalogoAPP",
       tituloBacklog: "APP_Catalogo",
-      titulos: ["CatalogoAPP", "Catálogo APP", "APP_Catalogo", "APP Catálogo"]
+      titulos: ["CatalogoAPP", "Cat\u00e1logo APP", "APP_Catalogo", "APP Cat\u00e1logo"]
     },
     tipoServicio: {
       interno: "Tipo_x0020_de_x0020_servicio",
@@ -49,7 +49,7 @@
     descripcion: {
       interno: "Descripci_x00f3_n_x0020_de_x0020_la_x0020_solicitud_x0020_",
       tipo: "texto",
-      titulos: ["Descripcion de la solicitud", "Descripcion", "Detalle"]
+      titulos: ["Descripci\u00f3n de la solicitud", "Descripci\u00f3n", "Detalle"]
     },
     solicitadoPor: {
       interno: "Solicitado_x0020_por",
@@ -66,14 +66,14 @@
       tipo: "busqueda",
       listaCatalogo: "CatalogoPrioridades",
       tituloBacklog: "Prioridades_Catalogo",
-      titulos: ["Prioridades_Catalogo", "Prioridad_Catalogo", "Catálogo de prioridades"]
+      titulos: ["Prioridades_Catalogo", "Prioridad_Catalogo", "Cat\u00e1logo de prioridades"]
     },
     estado: {
       interno: "Estado_x005f_Catalogo",
       tipo: "busqueda",
       listaCatalogo: "CatalogoEstados",
       tituloBacklog: "Estado_Catalogo",
-      titulos: ["Estado_Catalogo", "Estados_Catalogo", "Catálogo de estados"]
+      titulos: ["Estado_Catalogo", "Estados_Catalogo", "Cat\u00e1logo de estados"]
     },
     comentarios: {
       interno: "Comentarios",
@@ -128,7 +128,7 @@
   let esAdministradorActual = null;
 
   // --------------------------------------------------------------------------
-  // Contexto de SharePoint y construcción segura de rutas
+  // Contexto de SharePoint y construccion segura de rutas
   // --------------------------------------------------------------------------
   function urlSitio() {
     const contexto = global._spPageContextInfo;
@@ -439,9 +439,11 @@
     const seleccion = [
       "*",
       "AttachmentFiles/FileName",
-      "AttachmentFiles/ServerRelativeUrl"
+      "AttachmentFiles/ServerRelativeUrl",
+      "Author/Title",
+      "Author/EMail"
     ];
-    const expansion = ["AttachmentFiles"];
+    const expansion = ["AttachmentFiles", "Author"];
 
     Object.keys(CAMPOS).forEach(function (clave) {
       const campo = resolverCampo(clave);
@@ -477,6 +479,11 @@
         : [];
     const resultado = {
       spItemId: item.Id,
+      creadoPor: item.Author && item.Author.Title ? item.Author.Title : "",
+      creadoPorCorreo:
+        item.Author && (item.Author.EMail || item.Author.Email)
+          ? item.Author.EMail || item.Author.Email
+          : "",
       archivosAdjuntos: archivos.map(function (archivo) {
         return {
           nombre: archivo.FileName || "",
@@ -692,7 +699,7 @@
         const catalogo = catalogosPorNombre[configuracion.listaCatalogo];
         if (!campo) {
           throw new Error(
-            "No se encontró la columna " +
+            "No se encontr\u00f3 la columna " +
               configuracion.tituloBacklog +
               " en Backlog."
           );
@@ -732,7 +739,7 @@
           );
           if (!elemento) {
             throw new Error(
-              "La opción seleccionada para " +
+              "La opci\u00f3n seleccionada para " +
                 configuracion.tituloBacklog +
                 " no existe en " +
                 configuracion.listaCatalogo +
@@ -748,7 +755,7 @@
           throw new Error(
             "La columna " +
               configuracion.tituloBacklog +
-              " debe ser Lookup, Texto u Opción."
+              " debe ser Lookup, Texto u Opci\u00f3n."
           );
         }
       }
@@ -1217,7 +1224,7 @@
     }
     if (columnasBusquedaInvalidas.length > 0) {
       advertencias.push(
-        "Revisar las columnas de catálogo de Backlog relacionadas con: " +
+        "Revisar las columnas de cat\u00e1logo de Backlog relacionadas con: " +
           columnasBusquedaInvalidas.join(", ")
       );
     }
@@ -1739,7 +1746,7 @@
       };
       if (prioridadEsperada !== prioridadGuardada) {
         throw new Error(
-          "SharePoint actualizó el requerimiento, pero la prioridad guardada no coincide con la seleccionada."
+          "SharePoint actualiz\u00f3 el requerimiento, pero la prioridad guardada no coincide con la seleccionada."
         );
       }
     }

@@ -1,5 +1,5 @@
 /*
- * Estilos de la Bitácora de requerimientos.
+ * Estilos de la Bitacora de requerimientos.
  * Las reglas se limitan a #bitacora-app para no afectar el chrome de SharePoint.
  */
 
@@ -659,6 +659,80 @@ opacity:.9;
   margin-bottom: 0;
   color: var(--muted);
   font-size: 12px;
+}
+
+.my-requests-tabs {
+  display: grid;
+  margin: -4px -4px 18px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.my-requests-tab {
+  display: flex;
+  width: 100%;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: #fff;
+  color: #34445e;
+  font-size: 12px;
+  font-weight: 650;
+  text-align: left;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.my-requests-tab:last-child {
+  border-bottom: 0;
+}
+
+.my-requests-tab:hover {
+  background: #f8fafc;
+  color: var(--blue-700);
+}
+
+.my-requests-tab.active {
+  background: var(--blue-100);
+  color: var(--navy-900);
+  box-shadow: inset 3px 0 0 var(--blue-600);
+}
+
+.my-requests-tab-arrow {
+  position: relative;
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: #fff;
+}
+
+.my-requests-tab-arrow::after {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid #69778c;
+  content: "";
+}
+
+.my-requests-tab.active .my-requests-tab-arrow {
+  border-color: #91b8ee;
+}
+
+.my-requests-tab.active .my-requests-tab-arrow::after {
+  border-left-color: var(--blue-600);
+}
+
+#panel-mis-requerimientos {
+  min-width: 0;
 }
 
 .filters {
@@ -2690,7 +2764,7 @@ color:#2563eb;
 
 
 
-/* CONTENEDORES GRAFICAS */
+/* CONTENEDORES DE GRAFICAS */
 
 
 .dashboard-two-columns{
@@ -2750,7 +2824,7 @@ grid-template-columns:1fr;
 
 }
 /* ==================================
-   AJUSTE GRAFICAS INDICADORES
+   AJUSTE DE GRAFICAS DE INDICADORES
 ================================== */
 
 
@@ -2901,7 +2975,7 @@ grid-template-columns:1fr;
 }
 
 
-/* separación visual */
+/* Separacion visual. */
 
 .nav-section {
 
