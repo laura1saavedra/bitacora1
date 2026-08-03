@@ -482,7 +482,7 @@ Resumen operativo
 
               </div>
               <div class="form-group">
-                <label for="estado">Estado inicial</label>
+                <label for="estado" id="etiqueta-estado">Estado inicial</label>
                 <select id="estado" disabled>
                   <option value="">Cargando estados&#8230;</option>
                 </select>
@@ -498,7 +498,7 @@ Resumen operativo
             <div class="panel-heading">
               <div>
                 <h2 id="titulo-info-administrativa">Informaci&#243;n administrativa</h2>
-                <p>Campos disponibles para los administradores durante la edici&#243;n.</p>
+                <p>Campos disponibles durante la edici&#243;n del requerimiento.</p>
               </div>
             </div>
             <div class="form-grid three-columns">
@@ -508,11 +508,19 @@ Resumen operativo
               </div>
               <div class="form-group">
                 <label for="responsable">Responsable</label>
-                <input type="email" id="responsable" placeholder="correo@hitss.com">
+                <div class="gestion-campo-autocompletar">
+                  <input type="text" id="responsable" class="gestion-responsable"
+                    placeholder="Buscar responsable" autocomplete="off">
+                  <div class="gestion-sugerencias" hidden></div>
+                </div>
               </div>
               <div class="form-group">
                 <label for="mentor">Mentor</label>
-                <input type="email" id="mentor" placeholder="correo@hitss.com">
+                <div class="gestion-campo-autocompletar">
+                  <input type="text" id="mentor" class="gestion-mentor"
+                    placeholder="Buscar mentor" autocomplete="off">
+                  <div class="gestion-sugerencias" hidden></div>
+                </div>
               </div>
               <div class="form-group">
                 <label for="prioridad">Prioridad</label>
@@ -559,7 +567,7 @@ Resumen operativo
           </div>
           <button class="btn-primary" type="button" data-vista="crear">Crear requerimiento</button>
         </header>
-        <section class="panel">
+        <section class="panel my-requests-tabs-panel">
           <div class="my-requests-tabs" role="tablist" aria-label="Categor&#237;as de mis requerimientos"
             aria-orientation="vertical">
             <button class="my-requests-tab active" id="tab-mis-responsable" type="button" role="tab"
@@ -578,7 +586,10 @@ Resumen operativo
               <span>Requerimientos creados por m&#237;</span>
             </button>
           </div>
-          <div id="panel-mis-requerimientos" role="tabpanel" aria-labelledby="tab-mis-responsable">
+        </section>
+
+        <section class="panel" id="panel-mis-requerimientos" role="tabpanel"
+          aria-labelledby="tab-mis-responsable">
           <div class="filters" aria-label="Filtros de mis requerimientos">
             <label class="search" for="buscador-mis-requerimientos">
               <span aria-hidden="true">&#x2315;</span>
@@ -596,6 +607,9 @@ Resumen operativo
             <input type="date" class="fake-select" id="filtro-fecha-mis"
               aria-label="Filtrar mis requerimientos por fecha de solicitud"
               title="Filtrar por fecha de solicitud">
+            <button class="btn-link danger-link" id="btn-limpiar-filtros-mis" type="button">
+              &#215; Limpiar filtros
+            </button>
           </div>
           <div class="table-scroll">
             <table class="my-requests-table">
@@ -605,7 +619,6 @@ Resumen operativo
                   <th scope="col">APP</th>
                   <th scope="col">Tipo de servicio</th>
                   <th scope="col">Asunto</th>
-                  <th scope="col">Descripci&#243;n de la solicitud</th>
                   <th scope="col">Solicitado por</th>
                   <th scope="col">Responsable</th>
                   <th scope="col">Estado</th>
@@ -614,7 +627,7 @@ Resumen operativo
               </thead>
               <tbody id="tabla-mis-requerimientos">
                 <tr class="empty-row">
-                  <td colspan="9">Consultando tus requerimientos&#8230;</td>
+                  <td colspan="8">Consultando tus requerimientos&#8230;</td>
                 </tr>
               </tbody>
             </table>
@@ -625,7 +638,6 @@ Resumen operativo
             <nav class="pagination" id="controles-paginacion-mis"
               aria-label="Paginaci&#243;n de mis requerimientos"></nav>
           </footer>
-          </div>
         </section>
 
         <section class="panel" aria-labelledby="titulo-ciclo-atencion">

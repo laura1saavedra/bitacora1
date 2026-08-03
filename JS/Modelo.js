@@ -1363,6 +1363,110 @@
     return requerimiento;
   }
 
+  async function existeId(id) {
+    const idSeguro = literalOData(String(id || "").trim());
+    if (!idSeguro) {
+      return false;
+    }
+    const respuesta = await solicitar(
+      endpointLista() +
+        "/items?$select=Id&$filter=Title eq '" +
+        encodeURIComponent(idSeguro) +
+        "'&$top=1",
+      {
+        method: "GET",
+        credentials: "same-origin",
+        headers: ODATA
+      }
+    );
+    if (!respuesta.ok) {
+      const detalle = await detalleErrorSharePoint(respuesta);
+      throw new Error(
+        "No se pudo validar el ID del requerimiento (HTTP " +
+          respuesta.status +
+          ")" +
+          (detalle ? ": " + detalle : ".")
+      );
+    }
+    const datos = await respuesta.json();
+    return Boolean(datos.d.results.length);
+  }
+
+  function siguienteId(id) {
+    const coincidencia = /^(\d{6})(\d+)$/.exec(String(id || "").trim());
+    if (!coincidencia) {
+      throw new Error("El ID del requerimiento no tiene el formato esperado.");
+    }
+    return (
+      coincidencia[1] +
+      String(Number(coincidencia[2]) + 1).padStart(
+        Math.max(2, coincidencia[2].length),
+        "0"
+      )
+    );
+  }
+
+  function pareceConflictoDeCarpeta(estado, detalle) {
+    return (
+      estado === 409 ||
+      /already exists|ya existe|duplicate|duplicad/i.test(String(detalle || ""))
+    );
+  }
+
+  async function reservarId(id) {
+    if (await existeId(id)) {
+      return false;
+    }
+
+    // La carpeta del requerimiento funciona como bloqueo atomico: SharePoint
+    // permite que solo una solicitud cree una ruta determinada. Una consulta
+    // previa, sin esta reserva, no evita que dos sesiones guarden a la vez.
+    const rutaCarpeta = rutaCarpetaRequerimiento({ id: id });
+    const valorDigest = await digest();
+    const respuesta = await solicitar(urlSitio() + "/_api/web/folders", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: Object.assign({}, ODATA, {
+        "Content-Type": "application/json;odata=verbose",
+        "X-RequestDigest": valorDigest
+      }),
+      body: JSON.stringify({
+        __metadata: { type: "SP.Folder" },
+        ServerRelativeUrl: rutaCarpeta
+      })
+    });
+
+    if (respuesta.ok) {
+      return true;
+    }
+
+    const detalle = await detalleErrorSharePoint(respuesta);
+    if (pareceConflictoDeCarpeta(respuesta.status, detalle)) {
+      return false;
+    }
+    throw new Error(
+      "No se pudo reservar el ID del requerimiento (HTTP " +
+        respuesta.status +
+        ")" +
+        (detalle ? ": " + detalle : ".")
+    );
+  }
+
+  async function crearConReserva(item) {
+    const reservado = await reservarId(item.id);
+    if (!reservado) {
+      return {
+        creado: false,
+        idOcupado: item.id,
+        siguienteId: siguienteId(item.id)
+      };
+    }
+    return {
+      creado: true,
+      requerimiento: await crear(item)
+    };
+  }
+
   async function crear(item) {
     if (!esquemaLista) {
       await verificarConexion();
@@ -2054,7 +2158,10 @@ return datos.map(function(req){
     obtenerTodos: obtenerTodos,
     obtenerDatosIndicadores: obtenerDatosIndicadores,
     obtenerPorId: obtenerPorId,
+    existeId: existeId,
+    siguienteId: siguienteId,
     crear: crear,
+    crearConReserva: crearConReserva,
     guardarArchivosRequerimiento: guardarArchivosRequerimiento,
     obtenerArchivosRequerimiento: obtenerArchivosRequerimiento,
     obtenerDocumentosRequerimiento: obtenerDocumentosRequerimiento,

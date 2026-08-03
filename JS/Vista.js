@@ -191,8 +191,8 @@
     }
   }
 
-  function botonEditar(req) {
-    if (!esAdministradorSesion) {
+  function botonEditar(req, permitirEdicionUsuario) {
+    if (!esAdministradorSesion && !permitirEdicionUsuario) {
       return "";
     }
     return (
@@ -435,9 +435,6 @@ function renderizarTabla(datos, paginacion) {
               '<td data-label="APP">' + textoSeguro(req.app) + "</td>" +
               '<td data-label="Tipo de servicio">' + textoSeguro(req.tipoServicio) + "</td>" +
               '<td data-label="Asunto">' + textoSeguro(req.asunto) + "</td>" +
-              '<td class="request-description" data-label="Descripci\u00f3n" title="' +
-              textoSeguro(req.descripcion) +
-              '">' + textoSeguro(req.descripcion || "Sin descripci\u00f3n") + "</td>" +
               '<td data-label="Solicitado por">' + textoSeguro(req.solicitadoPor) + "</td>" +
               '<td data-label="Responsable">' + textoSeguro(req.responsable || "No asignado") + "</td>" +
               '<td data-label="Estado">' + textoSeguro(req.estado) + "</td>" +
@@ -448,12 +445,12 @@ function renderizarTabla(datos, paginacion) {
               '" type="button" aria-label="Ver requerimiento ' +
               textoSeguro(req.id) +
               '" title="Ver detalle">' + ICONO_OJO + "</button>" +
-              botonEditar(req) +
+              botonEditar(req, true) +
               "</div></td></tr>"
             );
           })
           .join("")
-      : '<tr class="empty-row"><td colspan="9">' +
+      : '<tr class="empty-row"><td colspan="8">' +
         (paginacion && paginacion.filtrosActivos
           ? "No hay requerimientos que coincidan con los filtros."
           : cuerpo.dataset.mensajeVacio || "No tienes requerimientos registrados.") +

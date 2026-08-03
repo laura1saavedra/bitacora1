@@ -1271,6 +1271,7 @@ if(graficaResponsables){
     document.getElementById("btn-guardar").textContent = "Guardar requerimiento";
     document.getElementById("btn-limpiar").hidden = false;
     document.getElementById("campos-administrativos").hidden = true;
+    document.getElementById("etiqueta-estado").textContent = "Estado inicial";
     document.getElementById("id").readOnly = true;
     document.getElementById("estado").disabled = true;
     document.getElementById("fechaSolicitud").readOnly = true;
@@ -1300,6 +1301,12 @@ if(graficaResponsables){
       const campo = document.getElementById(id);
       if (campo) {
         campo.value = "";
+        if (id === "responsable" || id === "mentor") {
+          delete campo.dataset.idSugerido;
+          delete campo.dataset.nombreSugerido;
+          delete campo.dataset.original;
+          Vista.ocultarSugerenciasGestion(campo);
+        }
       }
     });
     document.getElementById("solicitadoPor").value =
@@ -1318,11 +1325,16 @@ if(graficaResponsables){
         String(hoy.getFullYear()).slice(-2) +
         String(hoy.getMonth() + 1).padStart(2, "0") +
         String(hoy.getDate()).padStart(2, "0");
-      const cantidad = datos.filter(function (req) {
-        return String(req.id).indexOf(prefijo) === 0;
-      }).length;
+      const ultimoConsecutivo = datos.reduce(function (maximo, req) {
+        const coincidencia = new RegExp("^" + prefijo + "(\\d+)$").exec(
+          String(req.id || "")
+        );
+        return coincidencia
+          ? Math.max(maximo, Number(coincidencia[1]))
+          : maximo;
+      }, 0);
       document.getElementById("id").value =
-        prefijo + String(cantidad + 1).padStart(2, "0");
+        prefijo + String(ultimoConsecutivo + 1).padStart(2, "0");
     } catch (error) {
       console.error("Generaci\u00f3n de ID:", error);
       document.getElementById("id").value = "";
@@ -1372,14 +1384,28 @@ if(graficaResponsables){
     return partesInicioSesion[partesInicioSesion.length - 1].trim();
   }
 
+  function fueCreadoPorUsuarioActual(req) {
+    return coincideConUsuarioActual(req.creadoPor, req.creadoPorCorreo) ||
+      (!req.creadoPor && !req.creadoPorCorreo && esRequerimientoPropio(req));
+  }
+
+  function puedeEditarRequerimiento(req) {
+    if (!req) {
+      return false;
+    }
+    return esAdministradorSesion ||
+      fueCreadoPorUsuarioActual(req) ||
+      coincideConUsuarioActual(req.mentor, req.mentorCorreo) ||
+      coincideConUsuarioActual(req.responsable, req.responsableCorreo);
+  }
+
   function obtenerMisRequerimientosPorTipo(tipo) {
     return todosMisRequerimientos.filter(function (req) {
       if (tipo === "mentor") {
         return coincideConUsuarioActual(req.mentor, req.mentorCorreo);
       }
       if (tipo === "creados") {
-        return coincideConUsuarioActual(req.creadoPor, req.creadoPorCorreo) ||
-          (!req.creadoPor && !req.creadoPorCorreo && esRequerimientoPropio(req));
+        return fueCreadoPorUsuarioActual(req);
       }
       return coincideConUsuarioActual(req.responsable, req.responsableCorreo);
     });
@@ -1443,14 +1469,6 @@ if(graficaResponsables){
 
   async function editarRequerimiento(id, origen) {
     const origenFinal = origen === "dashboard" ? "dashboard" : "mis";
-    if (!esAdministradorSesion) {
-      await mostrarAlerta({
-        icon: "warning",
-        title: "Edici\u00f3n no permitida",
-        text: "Solo los administradores de la Bit\u00e1cora pueden editar requerimientos."
-      });
-      return;
-    }
     try {
       const req = await Modelo.obtenerPorId(id);
       if (!req) {
@@ -1461,11 +1479,11 @@ if(graficaResponsables){
         });
         return;
       }
-      if (origenFinal !== "dashboard" && !esRequerimientoPropio(req)) {
+      if (!puedeEditarRequerimiento(req)) {
         await mostrarAlerta({
           icon: "warning",
           title: "Edici\u00f3n no permitida",
-          text: "Solo puede editar requerimientos solicitados por usted."
+          text: "Solo puede editar requerimientos creados por usted o en los que figure como mentor o responsable."
         });
         return;
       }
@@ -1482,6 +1500,8 @@ if(graficaResponsables){
       document.getElementById("btn-guardar").textContent = "Guardar cambios";
       document.getElementById("btn-limpiar").hidden = true;
       document.getElementById("campos-administrativos").hidden = false;
+      document.getElementById("etiqueta-estado").textContent =
+        origenFinal === "mis" ? "Estado" : "Estado inicial";
       document.getElementById("estado").disabled = false;
       document.getElementById("buscarUsuario").value = "";
       document.getElementById("buscarUsuario").hidden = true;
@@ -1505,10 +1525,18 @@ if(graficaResponsables){
       document.getElementById("comentarios").value = String(
         req.comentarios || ""
       ).slice(0, 500);
-      document.getElementById("responsable").value =
-        req.responsableCorreo || req.responsable || "";
-      document.getElementById("mentor").value =
-        req.mentorCorreo || req.mentor || "";
+      const campoResponsable = document.getElementById("responsable");
+      const campoMentor = document.getElementById("mentor");
+      campoResponsable.value = req.responsable || req.responsableCorreo || "";
+      campoResponsable.dataset.original = campoResponsable.value;
+      delete campoResponsable.dataset.idSugerido;
+      delete campoResponsable.dataset.nombreSugerido;
+      Vista.ocultarSugerenciasGestion(campoResponsable);
+      campoMentor.value = req.mentor || req.mentorCorreo || "";
+      campoMentor.dataset.original = campoMentor.value;
+      delete campoMentor.dataset.idSugerido;
+      delete campoMentor.dataset.nombreSugerido;
+      Vista.ocultarSugerenciasGestion(campoMentor);
       establecerValorCatalogo(
         "prioridad",
         catalogos.prioridades,
@@ -1547,7 +1575,7 @@ if(graficaResponsables){
   }
 
   async function eliminarArchivoEdicion(boton) {
-    if (!esAdministradorSesion || !requerimientoEnEdicion) {
+    if (!puedeEditarRequerimiento(requerimientoEnEdicion)) {
       return;
     }
     const url = boton.dataset.eliminarArchivo || "";
@@ -2419,11 +2447,14 @@ async function buscarUsuarios() {
 }
 
   async function guardarFormulario() {
-    if (requerimientoEnEdicion && !esAdministradorSesion) {
+    if (
+      requerimientoEnEdicion &&
+      !puedeEditarRequerimiento(requerimientoEnEdicion)
+    ) {
       await mostrarAlerta({
         icon: "warning",
         title: "Edici\u00f3n no permitida",
-        text: "Solo los administradores de la Bit\u00e1cora pueden guardar cambios."
+        text: "Solo puede guardar cambios en requerimientos creados por usted o en los que figure como mentor o responsable."
       });
       return;
     }
@@ -2451,24 +2482,17 @@ async function buscarUsuarios() {
           fechaPAP: datos.fechaPAP,
           fechaCierre: datos.fechaCierre
         };
-        const responsableOriginal =
-          requerimientoEnEdicion.responsableCorreo ||
-          requerimientoEnEdicion.responsable ||
-          "";
-        const mentorOriginal =
-          requerimientoEnEdicion.mentorCorreo ||
-          requerimientoEnEdicion.mentor ||
-          "";
-
-        if (datos.responsable !== responsableOriginal) {
-          cambios.responsable = datos.responsable
-            ? (await Modelo.resolverUsuarioPorCorreo(datos.responsable)).id
-            : null;
+        const idResponsable = await resolverPersonaCampoGestion(
+          document.getElementById("responsable")
+        );
+        const idMentor = await resolverPersonaCampoGestion(
+          document.getElementById("mentor")
+        );
+        if (idResponsable !== undefined) {
+          cambios.responsable = idResponsable;
         }
-        if (datos.mentor !== mentorOriginal) {
-          cambios.mentor = datos.mentor
-            ? (await Modelo.resolverUsuarioPorCorreo(datos.mentor)).id
-            : null;
+        if (idMentor !== undefined) {
+          cambios.mentor = idMentor;
         }
 
         const requerimientoActualizado = await Modelo.actualizar(
@@ -2514,16 +2538,50 @@ async function buscarUsuarios() {
           Vista.mostrarMisRequerimientos();
         }
       } else {
-        const requerimientoCreado = await Modelo.crear(datos);
+        let datosCreacion = Object.assign({}, datos);
+        let resultadoCreacion;
+        let intentos = 0;
+
+        do {
+          resultadoCreacion = await Modelo.crearConReserva(datosCreacion);
+          if (!resultadoCreacion.creado) {
+            intentos += 1;
+            if (intentos >= 100) {
+              throw new Error(
+                "No fue posible asignar un ID disponible. Intente nuevamente."
+              );
+            }
+            document.getElementById("id").value =
+              resultadoCreacion.siguienteId;
+            await mostrarAlerta({
+              icon: "warning",
+              title: "ID de requerimiento actualizado",
+              text:
+                "El ID " +
+                resultadoCreacion.idOcupado +
+                " ya fue utilizado por otro requerimiento. Se asign\u00f3 el nuevo ID " +
+                resultadoCreacion.siguienteId +
+                " para evitar un registro duplicado.",
+              confirmButtonText: "Continuar",
+              confirmButtonColor: "#2f6fed"
+            });
+            datosCreacion.id = resultadoCreacion.siguienteId;
+          }
+        } while (!resultadoCreacion.creado);
+
+        const requerimientoCreado = resultadoCreacion.requerimiento;
         const resultadoArchivos = await Modelo.guardarArchivosRequerimiento(
           requerimientoCreado,
           archivosClasificados
         );
         await registrarActividadCompartida(
-          "Cre\u00f3 el requerimiento " + datos.id + " - " + datos.asunto,
+          "Cre\u00f3 el requerimiento " +
+            requerimientoCreado.id +
+            " - " +
+            datos.asunto,
           {
             tipo: "Creaci\u00f3n",
-            requerimiento: datos.id
+            requerimiento: requerimientoCreado.id
           }
         );
         if (
@@ -2537,12 +2595,12 @@ async function buscarUsuarios() {
           title: "\u00a1Requerimiento registrado!",
           html:
             "<b>ID del requerimiento:</b> " +
-            datos.id +
+            requerimientoCreado.id +
             "<br><br>El requerimiento fue registrado correctamente." +
             textoResultadoArchivos(resultadoArchivos),
           text:
             "Requerimiento " +
-            datos.id +
+            requerimientoCreado.id +
             " registrado correctamente." +
             textoResultadoArchivos(resultadoArchivos),
           confirmButtonText: "Aceptar",
@@ -2624,6 +2682,17 @@ async function buscarUsuarios() {
   }
 
   function buscarMisRequerimientos() {
+    paginaMisRequerimientos = 1;
+    renderizarPaginaMisRequerimientos();
+  }
+
+  function limpiarFiltrosMisRequerimientos() {
+    document.getElementById("buscador-mis-requerimientos").value = "";
+    ["filtro-app-mis", "filtro-estado-mis", "filtro-fecha-mis"].forEach(
+      function (id) {
+        document.getElementById(id).value = "";
+      }
+    );
     paginaMisRequerimientos = 1;
     renderizarPaginaMisRequerimientos();
   }
@@ -3062,6 +3131,64 @@ async function buscarUsuarios() {
     }
   }
 
+  function esCampoAutocompletarPersona(campo) {
+    return Boolean(
+      campo &&
+      campo.classList &&
+      (campo.classList.contains("gestion-responsable") ||
+        campo.classList.contains("gestion-mentor"))
+    );
+  }
+
+  function seleccionarSugerenciaPersona(sugerencia) {
+    const contenedor = sugerencia.closest(".gestion-campo-autocompletar");
+    const campo = contenedor ? contenedor.querySelector("input") : null;
+    if (!campo) {
+      return;
+    }
+    campo.value = sugerencia.dataset.nombre;
+    campo.dataset.idSugerido = sugerencia.dataset.id;
+    campo.dataset.nombreSugerido = sugerencia.dataset.nombre;
+    Vista.ocultarSugerenciasGestion(campo);
+    campo.focus();
+  }
+
+  function registrarAutocompletadoPersonas(contenedor) {
+    if (!contenedor) {
+      return;
+    }
+    contenedor.addEventListener("click", function (evento) {
+      const sugerencia = evento.target.closest(".gestion-sugerencia-item");
+      if (sugerencia) {
+        seleccionarSugerenciaPersona(sugerencia);
+      }
+    });
+    contenedor.addEventListener("input", function (evento) {
+      const campo = evento.target;
+      if (!esCampoAutocompletarPersona(campo)) {
+        return;
+      }
+      delete campo.dataset.idSugerido;
+      delete campo.dataset.nombreSugerido;
+      global.clearTimeout(temporizadorSugerenciasGestion);
+      temporizadorSugerenciasGestion = global.setTimeout(function () {
+        buscarSugerenciasGestion(campo);
+      }, 300);
+    });
+    contenedor.addEventListener(
+      "focusout",
+      function (evento) {
+        const campo = evento.target;
+        if (esCampoAutocompletarPersona(campo)) {
+          global.setTimeout(function () {
+            Vista.ocultarSugerenciasGestion(campo);
+          }, 150);
+        }
+      },
+      true
+    );
+  }
+
   
   async function guardarGestion(id, fila) {
     const comentarios = fila.querySelector(".gestion-comentarios").value.trim();
@@ -3245,6 +3372,9 @@ if(btnLimpiarIndicadores){
           .getElementById(id)
           .addEventListener("change", buscarMisRequerimientos);
       });
+    document
+      .getElementById("btn-limpiar-filtros-mis")
+      .addEventListener("click", limpiarFiltrosMisRequerimientos);
     [
       "filtro-app",
       "filtro-responsable",
@@ -3387,19 +3517,6 @@ if(btnLimpiarIndicadores){
 document
       .getElementById("tabla-gestion")
       .addEventListener("click", function (evento) {
-        const sugerencia = evento.target.closest(".gestion-sugerencia-item");
-        if (sugerencia) {
-          const contenedor = sugerencia.closest(".gestion-campo-autocompletar");
-          const campo = contenedor ? contenedor.querySelector("input") : null;
-          if (campo) {
-            campo.value = sugerencia.dataset.nombre;
-            campo.dataset.idSugerido = sugerencia.dataset.id;
-            campo.dataset.nombreSugerido = sugerencia.dataset.nombre;
-            Vista.ocultarSugerenciasGestion(campo);
-            campo.focus();
-          }
-          return;
-        }
         const botonConfirmar = evento.target.closest(".confirm-btn-gestion");
         if (botonConfirmar) {
           guardarGestion(botonConfirmar.dataset.id, botonConfirmar.closest("tr"));
@@ -3434,37 +3551,13 @@ document
           }
           return;
         }
-        if (
-          campo.classList &&
-          (campo.classList.contains("gestion-responsable") ||
-            campo.classList.contains("gestion-mentor"))
-        ) {
-          delete campo.dataset.idSugerido;
-          delete campo.dataset.nombreSugerido;
-          global.clearTimeout(temporizadorSugerenciasGestion);
-          temporizadorSugerenciasGestion = global.setTimeout(function () {
-            buscarSugerenciasGestion(campo);
-          }, 300);
-        }
       });
-    document
-      .getElementById("tabla-gestion")
-      .addEventListener(
-        "focusout",
-        function (evento) {
-          const campo = evento.target;
-          if (
-            campo.classList &&
-            (campo.classList.contains("gestion-responsable") ||
-              campo.classList.contains("gestion-mentor"))
-          ) {
-            global.setTimeout(function () {
-              Vista.ocultarSugerenciasGestion(campo);
-            }, 150);
-          }
-        },
-        true
-      );
+    registrarAutocompletadoPersonas(
+      document.getElementById("tabla-gestion")
+    );
+    registrarAutocompletadoPersonas(
+      document.getElementById("campos-administrativos")
+    );
 
     document
       .getElementById("buscador-gestion")
